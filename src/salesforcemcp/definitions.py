@@ -27,23 +27,26 @@ def get_tools():
                     "fields": {
                         "type": "array",
                         "description": "The fields of the object",
-                        "properties": {
-                            "type": {
-                                "type": "string",
-                                "enum": ["Text", "Number", "Lookup", "LongText"],
-                                "default": "Text",
-                                "description": "The type of the field",
-                             },
-                            "label": {
-                                "type": "string",
-                                "description": "The display name of the field",
-                             },
-                            "api_name": {
-                                "type": "string",
-                                "description": "The api_name of the field finished in __c",
-                             },
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["Text", "Number", "Lookup", "LongText"],
+                                    "default": "Text",
+                                    "description": "The type of the field",
+                                 },
+                                "label": {
+                                    "type": "string",
+                                    "description": "The display name of the field",
+                                 },
+                                "api_name": {
+                                    "type": "string",
+                                    "description": "The api_name of the field finished in __c",
+                                 },
+                            },
+                            "additionalProperties": True,
                         },
-                        "additionalProperties": True,
                     },
                 },
                 "required": ["name", "plural_name", "api_name", "fields"],
@@ -62,11 +65,14 @@ def get_tools():
                     "fields": {
                         "type": "array",
                         "description": "The fields of the object to be deleted",
-                        "properties": {
-                            "api_name": {
-                                "type": "string",
-                                "description": "The api_name of the field finished in __c",
-                             },
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "api_name": {
+                                    "type": "string",
+                                    "description": "The api_name of the field finished in __c",
+                                 },
+                            },
                         },
                     },
                 },
