@@ -5,7 +5,7 @@ from simple_salesforce import Salesforce
 from typing import Optional, Any
 import xml.etree.ElementTree as ET
 
-BASE_PATH=os.getenv("BASE_PATH", "/tmp"),
+BASE_PATH=os.getenv("BASE_PATH", "/tmp")
 
 class OrgHandler:
     """Manages interactions and caching for a Salesforce org."""
