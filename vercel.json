@@ -1,27 +1,18 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/mcp.py",
-      "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/mcp",
-      "dest": "/api/mcp.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/mcp.py"
-    }
-  ],
   "functions": {
     "api/mcp.py": {
+      "runtime": "python3.9",
       "maxDuration": 30
     }
   },
-  "env": {
-    "PYTHONPATH": "src"
-  }
+  "rewrites": [
+    {
+      "source": "/api/mcp",
+      "destination": "/api/mcp"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api/mcp"
+    }
+  ]
 }

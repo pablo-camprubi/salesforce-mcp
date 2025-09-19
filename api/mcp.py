@@ -2,6 +2,7 @@ import json
 import sys
 import os
 from typing import Any, Dict, List
+from http.server import BaseHTTPRequestHandler
 
 # Add the src directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -167,12 +168,61 @@ def handle_call_tool(request_id: Any, params: Dict[str, Any]):
     except Exception as e:
         return send_error(-32603, "Internal server error", request_id, str(e))
 
-def handler(request, context):
-    """Main Vercel serverless function handler"""
+class handler(BaseHTTPRequestHandler):
+    """Vercel serverless function handler compatible with Python runtime"""
     
-    # Handle CORS preflight requests
-    if request.method == 'OPTIONS':
-        return {
+    def do_POST(self):
+        try:
+            # Read the request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                post_data = self.rfile.read(content_length)
+            else:
+                post_data = b'{}'
+            
+            # Parse JSON-RPC request
+            try:
+                request_data = json.loads(post_data.decode('utf-8'))
+            except json.JSONDecodeError:
+                response = send_error(-32700, "Parse error", None)
+                self._send_vercel_response(response)
+                return
+            
+            # Validate JSON-RPC format
+            if not isinstance(request_data, dict) or request_data.get('jsonrpc') != '2.0':
+                response = send_error(-32600, "Invalid Request", request_data.get('id'))
+                self._send_vercel_response(response)
+                return
+            
+            method = request_data.get('method')
+            request_id = request_data.get('id')
+            params = request_data.get('params', {})
+            
+            if not method:
+                response = send_error(-32600, "Invalid Request", request_id)
+                self._send_vercel_response(response)
+                return
+            
+            # Handle different methods
+            if method == 'initialize':
+                response = handle_initialize(request_id, params)
+            elif method == 'tools/list':
+                response = handle_list_tools(request_id, params)
+            elif method == 'tools/call':
+                response = handle_call_tool(request_id, params)
+            else:
+                response = send_error(-32601, "Method not found", request_id)
+            
+            self._send_vercel_response(response)
+                
+        except Exception as e:
+            print(f"Error handling request: {e}")
+            response = send_error(-32603, "Internal server error", None, str(e))
+            self._send_vercel_response(response)
+    
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests"""
+        response = {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
@@ -181,76 +231,31 @@ def handler(request, context):
             },
             'body': ''
         }
+        self._send_vercel_response(response)
     
-    # Only handle POST requests
-    if request.method != 'POST':
-        return {
-            'statusCode': 405,
-            'headers': {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            'body': json.dumps({"error": "Method Not Allowed"})
-        }
-    
-    try:
-        # Parse JSON-RPC request
-        try:
-            if hasattr(request, 'body'):
-                body = request.body
-            elif hasattr(request, 'data'):
-                body = request.data
-            else:
-                # Try to get body from different possible attributes
-                body = getattr(request, 'get_body', lambda: b'{}')()
-            
-            if isinstance(body, str):
-                request_data = json.loads(body)
-            else:
-                request_data = json.loads(body.decode('utf-8'))
-        except (json.JSONDecodeError, AttributeError) as e:
-            return send_error(-32700, "Parse error", None)
+    def _send_vercel_response(self, response):
+        """Send response in Vercel format"""
+        self.send_response(response.get('statusCode', 200))
         
-        # Validate JSON-RPC format
-        if not isinstance(request_data, dict) or request_data.get('jsonrpc') != '2.0':
-            return send_error(-32600, "Invalid Request", request_data.get('id'))
+        headers = response.get('headers', {})
+        for key, value in headers.items():
+            self.send_header(key, value)
         
-        method = request_data.get('method')
-        request_id = request_data.get('id')
-        params = request_data.get('params', {})
+        self.end_headers()
         
-        if not method:
-            return send_error(-32600, "Invalid Request", request_id)
-        
-        # Handle different methods
-        if method == 'initialize':
-            return handle_initialize(request_id, params)
-        elif method == 'tools/list':
-            return handle_list_tools(request_id, params)
-        elif method == 'tools/call':
-            return handle_call_tool(request_id, params)
-        else:
-            return send_error(-32601, "Method not found", request_id)
-            
-    except Exception as e:
-        print(f"Error handling request: {e}")
-        return send_error(-32603, "Internal server error", None, str(e))
+        body = response.get('body', '')
+        if isinstance(body, str):
+            body = body.encode('utf-8')
+        self.wfile.write(body)
 
 # For local testing
 if __name__ == '__main__':
     # Simple test
-    test_request = {
-        'method': 'POST',
-        'body': json.dumps({
-            'jsonrpc': '2.0',
-            'method': 'initialize',
-            'id': 1,
-            'params': {}
-        })
-    }
+    import http.server
+    import socketserver
     
-    class TestContext:
-        pass
+    PORT = 8000
     
-    response = handler(test_request, TestContext())
-    print("Test response:", response)
+    with socketserver.TCPServer(("", PORT), handler) as httpd:
+        print(f"MCP Server running on http://localhost:{PORT}")
+        httpd.serve_forever()
