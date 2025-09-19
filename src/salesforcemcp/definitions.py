@@ -46,7 +46,7 @@ def get_tools():
                         "additionalProperties": True,
                     },
                 },
-                "required": ["name" "plural_name", "api_name", "fields"],
+                "required": ["name", "plural_name", "api_name", "fields"],
             },
         ),
         types.Tool(
