@@ -22,6 +22,15 @@ class handler(BaseHTTPRequestHandler):
                 "SALESFORCE_SECURITY_TOKEN": "SET" if os.getenv("SALESFORCE_SECURITY_TOKEN") else "MISSING"
             }
             
+            # Show ALL environment variables that start with "SALESFORCE"
+            all_sf_vars = {k: "SET" for k, v in os.environ.items() if k.startswith("SALESFORCE")}
+            
+            # Also check for other common variations
+            other_vars = {}
+            for name in ["USERNAME", "PASSWORD", "SECURITY_TOKEN", "SF_USERNAME", "SF_PASSWORD", "SF_SECURITY_TOKEN"]:
+                if os.getenv(name):
+                    other_vars[name] = "SET"
+            
             # Test Salesforce connection
             try:
                 from simple_salesforce import Salesforce
@@ -42,6 +51,8 @@ class handler(BaseHTTPRequestHandler):
                 "id": request_data.get("id", 1),
                 "result": {
                     "environment": env_check,
+                    "all_salesforce_vars": all_sf_vars,
+                    "other_possible_vars": other_vars,
                     "salesforce_test": sf_status,
                     "request_received": request_data
                 }
