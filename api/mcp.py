@@ -28,14 +28,14 @@ def get_sf_client():
         return None
     
     import os
-    # Debug environment variables
-    username = os.getenv("USERNAME")
-    password = os.getenv("PASSWORD") 
-    security_token = os.getenv("SECURITY_TOKEN")
+    # Debug environment variables  
+    username = os.getenv("SALESFORCE_USERNAME")
+    password = os.getenv("SALESFORCE_PASSWORD") 
+    security_token = os.getenv("SALESFORCE_SECURITY_TOKEN")
     
-    print(f"Environment check - USERNAME: {'SET' if username else 'MISSING'}")
-    print(f"Environment check - PASSWORD: {'SET' if password else 'MISSING'}")  
-    print(f"Environment check - SECURITY_TOKEN: {'SET' if security_token else 'MISSING'}")
+    print(f"Environment check - SALESFORCE_USERNAME: {'SET' if username else 'MISSING'}")
+    print(f"Environment check - SALESFORCE_PASSWORD: {'SET' if password else 'MISSING'}")  
+    print(f"Environment check - SALESFORCE_SECURITY_TOKEN: {'SET' if security_token else 'MISSING'}")
     
     if not all([username, password, security_token]):
         print("Missing required Salesforce credentials in environment variables")
