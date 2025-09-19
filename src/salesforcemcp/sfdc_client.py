@@ -22,9 +22,9 @@ class OrgHandler:
         """
         try:
             self.connection = Salesforce(
-                username=os.getenv("SALESFORCE_USERNAME"),
-                password=os.getenv("SALESFORCE_PASSWORD"),
-                security_token=os.getenv("SALESFORCE_SECURITY_TOKEN")
+                username=os.getenv("USERNAME"),
+                password=os.getenv("PASSWORD"),
+                security_token=os.getenv("SECURITY_TOKEN")
             )
             return True
         except Exception as e:

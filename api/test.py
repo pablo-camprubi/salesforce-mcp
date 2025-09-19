@@ -34,10 +34,11 @@ class handler(BaseHTTPRequestHandler):
             # Test Salesforce connection
             try:
                 from simple_salesforce import Salesforce
+                # Use the working variable names
                 sf = Salesforce(
-                    username=os.getenv("SALESFORCE_USERNAME"),
-                    password=os.getenv("SALESFORCE_PASSWORD"),
-                    security_token=os.getenv("SALESFORCE_SECURITY_TOKEN")
+                    username=os.getenv("USERNAME"),
+                    password=os.getenv("PASSWORD"), 
+                    security_token=os.getenv("SECURITY_TOKEN")
                 )
                 # Try a simple query
                 result = sf.query("SELECT COUNT() FROM Account")
