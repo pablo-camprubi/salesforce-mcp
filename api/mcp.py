@@ -20,17 +20,41 @@ except ImportError as e:
     sfmcpimpl = None
     types = None
 
-# Initialize the Salesforce client once
-sf_client = None
-if sfdc_client:
+# Salesforce client will be initialized per request
+def get_sf_client():
+    """Get a fresh Salesforce client connection"""
+    if not sfdc_client:
+        print("sfdc_client module not available")
+        return None
+    
+    import os
+    # Debug environment variables
+    username = os.getenv("USERNAME")
+    password = os.getenv("PASSWORD") 
+    security_token = os.getenv("SECURITY_TOKEN")
+    
+    print(f"Environment check - USERNAME: {'SET' if username else 'MISSING'}")
+    print(f"Environment check - PASSWORD: {'SET' if password else 'MISSING'}")  
+    print(f"Environment check - SECURITY_TOKEN: {'SET' if security_token else 'MISSING'}")
+    
+    if not all([username, password, security_token]):
+        print("Missing required Salesforce credentials in environment variables")
+        return None
+    
     try:
-        sf_client = sfdc_client.OrgHandler()
-        if not sf_client.establish_connection():
-            print("Failed to initialize Salesforce connection")
-            sf_client = None
+        client = sfdc_client.OrgHandler()
+        print("OrgHandler created, attempting connection...")
+        if client.establish_connection():
+            print("Salesforce connection established successfully")
+            return client
+        else:
+            print("Failed to establish Salesforce connection - establish_connection returned False")
+            return None
     except Exception as e:
-        print(f"Error initializing Salesforce client: {e}")
-        sf_client = None
+        print(f"Exception creating Salesforce client: {str(e)}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        return None
 
 def send_json_rpc_response(request_id: Any, result: Any = None, error: Dict[str, Any] = None) -> Dict[str, Any]:
     """Create a JSON-RPC 2.0 response"""
@@ -87,7 +111,8 @@ def handle_list_tools(request_id: Any, params: Dict[str, Any]):
         
     try:
         all_tools = sfmcpdef.get_tools()
-        is_connected = sf_client and sf_client.metadata_cache is not None
+        client = get_sf_client()
+        is_connected = client and client.metadata_cache is not None
         
         if is_connected:
             tools = all_tools
@@ -125,27 +150,30 @@ def handle_call_tool(request_id: Any, params: Dict[str, Any]):
         if not name:
             return send_error(-32602, "Invalid params", request_id)
         
+        # Get a fresh Salesforce client for this request
+        client = get_sf_client()
+        
         # Call the appropriate tool implementation
         if name == "create_object":
-            result = sfmcpimpl.create_object_impl(sf_client, arguments)
+            result = sfmcpimpl.create_object_impl(client, arguments)
         elif name == "delete_object_fields":
-            result = sfmcpimpl.delete_object_fields_impl(sf_client, arguments)
+            result = sfmcpimpl.delete_object_fields_impl(client, arguments)
         elif name == "create_tab":
-            result = sfmcpimpl.create_tab_impl(sf_client, arguments)
+            result = sfmcpimpl.create_tab_impl(client, arguments)
         elif name == "create_custom_app":
-            result = sfmcpimpl.create_custom_app_impl(sf_client, arguments)
+            result = sfmcpimpl.create_custom_app_impl(client, arguments)
         elif name == "run_soql_query":
-            result = sfmcpimpl.run_soql_query_impl(sf_client, arguments)
+            result = sfmcpimpl.run_soql_query_impl(client, arguments)
         elif name == "run_sosl_search":
-            result = sfmcpimpl.run_sosl_search_impl(sf_client, arguments)
+            result = sfmcpimpl.run_sosl_search_impl(client, arguments)
         elif name == "get_object_fields":
-            result = sfmcpimpl.get_object_fields_impl(sf_client, arguments)
+            result = sfmcpimpl.get_object_fields_impl(client, arguments)
         elif name == "create_record":
-            result = sfmcpimpl.create_record_impl(sf_client, arguments)
+            result = sfmcpimpl.create_record_impl(client, arguments)
         elif name == "update_record":
-            result = sfmcpimpl.update_record_impl(sf_client, arguments)
+            result = sfmcpimpl.update_record_impl(client, arguments)
         elif name == "delete_record":
-            result = sfmcpimpl.delete_record_impl(sf_client, arguments)
+            result = sfmcpimpl.delete_record_impl(client, arguments)
         else:
             return send_error(-32601, f"Unknown tool: {name}", request_id)
         
