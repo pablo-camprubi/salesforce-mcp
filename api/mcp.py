@@ -24,8 +24,8 @@ except ImportError as e:
 def get_sf_client():
     """Get a fresh Salesforce client connection"""
     if not sfdc_client:
-        print("sfdc_client module not available")
-        return None
+        print("ERROR: sfdc_client module not available")
+        raise ValueError("Salesforce client module not initialized")
     
     import os
     # Debug environment variables - use working variable names
@@ -33,28 +33,39 @@ def get_sf_client():
     password = os.getenv("PASSWORD") 
     security_token = os.getenv("SECURITY_TOKEN")
     
+    # Enhanced debugging
+    print(f"=== Salesforce Connection Debug ===")
     print(f"Environment check - USERNAME: {'SET' if username else 'MISSING'}")
     print(f"Environment check - PASSWORD: {'SET' if password else 'MISSING'}")  
     print(f"Environment check - SECURITY_TOKEN: {'SET' if security_token else 'MISSING'}")
     
-    if not all([username, password, security_token]):
-        print("Missing required Salesforce credentials in environment variables")
-        return None
+    if not username:
+        raise ValueError("USERNAME environment variable is required but not set")
+    if not password:
+        raise ValueError("PASSWORD environment variable is required but not set")
+    if not security_token:
+        raise ValueError("SECURITY_TOKEN environment variable is required but not set")
     
     try:
+        print("Creating OrgHandler...")
         client = sfdc_client.OrgHandler()
         print("OrgHandler created, attempting connection...")
-        if client.establish_connection():
-            print("Salesforce connection established successfully")
+        
+        connection_result = client.establish_connection()
+        if connection_result:
+            print("✅ Salesforce connection established successfully")
+            print(f"Session ID: {client.connection.session_id[:10]}...")
+            print(f"Instance: {client.connection.sf_instance}")
             return client
         else:
-            print("Failed to establish Salesforce connection - establish_connection returned False")
-            return None
+            print("❌ Failed to establish Salesforce connection - establish_connection returned False")
+            raise ValueError("Salesforce authentication failed - check credentials")
+            
     except Exception as e:
-        print(f"Exception creating Salesforce client: {str(e)}")
+        print(f"❌ Exception creating Salesforce client: {str(e)}")
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
-        return None
+        raise ValueError(f"Salesforce connection failed: {str(e)}")
 
 def send_json_rpc_response(request_id: Any, result: Any = None, error: Dict[str, Any] = None) -> Dict[str, Any]:
     """Create a JSON-RPC 2.0 response"""
@@ -103,6 +114,44 @@ def handle_initialize(request_id: Any, params: Dict[str, Any]):
         }
     }
     return send_json_rpc_response(request_id, result)
+
+def handle_health_check(request_id: Any, params: Dict[str, Any]):
+    """Handle health check - useful for debugging server state"""
+    import os
+    
+    health_data = {
+        "status": "checking",
+        "timestamp": str(__import__('datetime').datetime.now()),
+        "environment_variables": {
+            "USERNAME": "SET" if os.getenv("USERNAME") else "MISSING",
+            "PASSWORD": "SET" if os.getenv("PASSWORD") else "MISSING", 
+            "SECURITY_TOKEN": "SET" if os.getenv("SECURITY_TOKEN") else "MISSING"
+        },
+        "modules": {
+            "sfdc_client": sfdc_client is not None,
+            "sfmcpdef": sfmcpdef is not None,
+            "sfmcpimpl": sfmcpimpl is not None,
+            "types": types is not None
+        }
+    }
+    
+    # Try Salesforce connection
+    try:
+        client = get_sf_client()
+        if client and client.connection:
+            health_data["salesforce_connection"] = {
+                "status": "connected",
+                "instance": client.connection.sf_instance,
+                "session_id": client.connection.session_id[:10] + "..." if client.connection.session_id else "none"
+            }
+        else:
+            health_data["salesforce_connection"] = {"status": "failed", "error": "No client returned"}
+        health_data["status"] = "healthy"
+    except Exception as e:
+        health_data["salesforce_connection"] = {"status": "error", "error": str(e)}
+        health_data["status"] = "unhealthy"
+    
+    return send_json_rpc_response(request_id, health_data)
 
 def handle_list_tools(request_id: Any, params: Dict[str, Any]):
     """Handle the tools/list method"""
@@ -238,6 +287,8 @@ class handler(BaseHTTPRequestHandler):
                 response = handle_list_tools(request_id, params)
             elif method == 'tools/call':
                 response = handle_call_tool(request_id, params)
+            elif method == 'health/check':
+                response = handle_health_check(request_id, params)
             else:
                 response = send_error(-32601, "Method not found", request_id)
             
@@ -248,13 +299,44 @@ class handler(BaseHTTPRequestHandler):
             response = send_error(-32603, "Internal server error", None, str(e))
             self._send_vercel_response(response)
     
+    def do_GET(self):
+        """Handle GET requests for health checks"""
+        try:
+            if self.path == '/health' or self.path == '/':
+                # Simple health check via GET
+                health_result = handle_health_check("health-check", {})
+                response = {
+                    'statusCode': 200,
+                    'headers': {
+                        'Content-Type': 'application/json',
+                        'Access-Control-Allow-Origin': '*'
+                    },
+                    'body': health_result['body']
+                }
+                self._send_vercel_response(response)
+            else:
+                # Not found
+                response = {
+                    'statusCode': 404,
+                    'headers': {'Content-Type': 'text/plain'},
+                    'body': 'Not Found'
+                }
+                self._send_vercel_response(response)
+        except Exception as e:
+            response = {
+                'statusCode': 500,
+                'headers': {'Content-Type': 'text/plain'},
+                'body': f'Health check error: {str(e)}'
+            }
+            self._send_vercel_response(response)
+
     def do_OPTIONS(self):
         """Handle CORS preflight requests"""
         response = {
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'POST, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization'
             },
             'body': ''
