@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FlexiPage xmlns="http://soap.sforce.com/2006/04/metadata">
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentName>##component_name##</componentName>
+                <identifier>##component_identifier##</identifier>
+            </componentInstance>
+        </itemInstances>
+        <mode>##region_mode##</mode>
+        <name>##region_name##</name>
+        <type>##region_type##</type>
+    </flexiPageRegions>
+    <masterLabel>##label##</masterLabel>
+    <parentFlexiPage>##parent_page##</parentFlexiPage>
+    <template>
+        <name>##template##</name>
+    </template>
+    <type>##page_type##</type>
+</FlexiPage> 

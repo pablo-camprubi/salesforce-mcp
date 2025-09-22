@@ -37,14 +37,19 @@ def get_sf_client():
     print(f"=== Salesforce Connection Debug ===")
     print(f"Environment check - USERNAME: {'SET' if username else 'MISSING'}")
     print(f"Environment check - PASSWORD: {'SET' if password else 'MISSING'}")  
-    print(f"Environment check - SECURITY_TOKEN: {'SET' if security_token else 'MISSING'}")
+    print(f"Environment check - SECURITY_TOKEN: {'SET' if security_token else 'EMPTY (trusted IP)'}")
     
     if not username:
         raise ValueError("USERNAME environment variable is required but not set")
     if not password:
         raise ValueError("PASSWORD environment variable is required but not set")
-    if not security_token:
-        raise ValueError("SECURITY_TOKEN environment variable is required but not set")
+    
+    # SECURITY_TOKEN can be empty for trusted IP ranges
+    if security_token is None:
+        security_token = ""
+        print("  SECURITY_TOKEN not set, using empty string (for trusted IP ranges)")
+    elif security_token == "":
+        print("  SECURITY_TOKEN is empty (for trusted IP ranges)")
     
     try:
         print("Creating OrgHandler...")
@@ -125,7 +130,7 @@ def handle_health_check(request_id: Any, params: Dict[str, Any]):
         "environment_variables": {
             "USERNAME": "SET" if os.getenv("USERNAME") else "MISSING",
             "PASSWORD": "SET" if os.getenv("PASSWORD") else "MISSING", 
-            "SECURITY_TOKEN": "SET" if os.getenv("SECURITY_TOKEN") else "MISSING"
+            "SECURITY_TOKEN": "SET" if os.getenv("SECURITY_TOKEN") else "EMPTY (trusted IP)"
         },
         "modules": {
             "sfdc_client": sfdc_client is not None,
@@ -168,7 +173,10 @@ def handle_list_tools(request_id: Any, params: Dict[str, Any]):
         else:
             print("Salesforce connection inactive. Filtering available tools.")
             live_connection_tools = {
-                "create_record", "delete_object_fields", "create_tab", "create_custom_app"
+                "create_record", "delete_object_fields", "create_tab", "create_custom_app", "create_object_with_fields",
+                "create_custom_fields", "define_tabs_on_app", "create_report_folder", "create_dashboard_folder",
+                "create_validation_rule", "create_custom_metadata_type", "create_lightning_page", "describe_object",
+                "describe_relationship_fields", "get_fields_by_type", "get_picklist_values", "get_validation_rules"
             }
             tools = [tool for tool in all_tools if tool.name not in live_connection_tools]
         
@@ -205,6 +213,8 @@ def handle_call_tool(request_id: Any, params: Dict[str, Any]):
         # Call the appropriate tool implementation
         if name == "create_object":
             result = sfmcpimpl.create_object_impl(client, arguments)
+        elif name == "create_object_with_fields":
+            result = sfmcpimpl.create_object_with_fields_impl(client, arguments)
         elif name == "delete_object_fields":
             result = sfmcpimpl.delete_object_fields_impl(client, arguments)
         elif name == "create_tab":
@@ -223,6 +233,30 @@ def handle_call_tool(request_id: Any, params: Dict[str, Any]):
             result = sfmcpimpl.update_record_impl(client, arguments)
         elif name == "delete_record":
             result = sfmcpimpl.delete_record_impl(client, arguments)
+        elif name == "create_custom_fields":
+            result = sfmcpimpl.create_custom_fields_impl(client, arguments)
+        elif name == "define_tabs_on_app":
+            result = sfmcpimpl.define_tabs_on_app_impl(client, arguments)
+        elif name == "create_report_folder":
+            result = sfmcpimpl.create_report_folder_impl(client, arguments)
+        elif name == "create_dashboard_folder":
+            result = sfmcpimpl.create_dashboard_folder_impl(client, arguments)
+        elif name == "create_validation_rule":
+            result = sfmcpimpl.create_validation_rule_impl(client, arguments)
+        elif name == "create_custom_metadata_type":
+            result = sfmcpimpl.create_custom_metadata_type_impl(client, arguments)
+        elif name == "create_lightning_page":
+            result = sfmcpimpl.create_lightning_page_impl(client, arguments)
+        elif name == "describe_object":
+            result = sfmcpimpl.describe_object_impl(client, arguments)
+        elif name == "describe_relationship_fields":
+            result = sfmcpimpl.describe_relationship_fields_impl(client, arguments)
+        elif name == "get_fields_by_type":
+            result = sfmcpimpl.get_fields_by_type_impl(client, arguments)
+        elif name == "get_picklist_values":
+            result = sfmcpimpl.get_picklist_values_impl(client, arguments)
+        elif name == "get_validation_rules":
+            result = sfmcpimpl.get_validation_rules_impl(client, arguments)
         else:
             return send_error(-32601, f"Unknown tool: {name}", request_id)
         

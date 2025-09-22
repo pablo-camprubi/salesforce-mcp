@@ -53,6 +53,77 @@ def get_tools():
             },
         ),
         types.Tool(
+            name="create_object_with_fields",
+            description="Create a new object in salesforce with enhanced field support including Picklist, Checkbox, URL, and more",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the object to be created. Fill always a value",
+                    },
+                    "plural_name": {
+                        "type": "string",
+                        "description": "The plural name of the object to be created. Fill always a value",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "The general description of the object purpose in a short sentence. Fill always a value",
+                    },
+                    "api_name": {
+                        "type": "string",
+                        "description": "The api name of the object to be created finished with __c",
+                    },
+                    "fields": {
+                        "type": "array",
+                        "description": "The fields of the object",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["Text", "Number", "Lookup", "LongText", "Picklist", "Checkbox", "URL"],
+                                    "default": "Text",
+                                    "description": "The type of the field",
+                                 },
+                                "label": {
+                                    "type": "string",
+                                    "description": "The display name of the field",
+                                 },
+                                "api_name": {
+                                    "type": "string",
+                                    "description": "The api_name of the field finished in __c",
+                                 },
+                                "picklist_values": {
+                                    "type": "array",
+                                    "description": "The values of the field when the type is picklist",
+                                    "items": {"type": "string"},
+                                },
+                                "defaultValue": {
+                                    "type": "boolean",
+                                    "description": "The default value for a Checkbox field (true or false). Optional. Defaults to false if not provided."
+                                },
+                                "referenceTo": {
+                                    "type": "string",
+                                    "description": "The API name of the object this Lookup field references (e.g., 'Account', 'Contact', 'CustomObject__c'). Required for Lookup fields."
+                                },
+                                "relationshipLabel": {
+                                    "type": "string",
+                                    "description": "The label for the relationship (e.g., 'Account'). Optional for Lookup fields."
+                                },
+                                "relationshipName": {
+                                    "type": "string",
+                                    "description": "The API name for the relationship (e.g., 'Account'). Optional for Lookup fields."
+                                }
+                            },
+                            "additionalProperties": True,
+                        },
+                    },
+                },
+                "required": ["name", "plural_name", "api_name", "description", "fields"],
+            },
+        ),
+        types.Tool(
             name="delete_object_fields",
             description="Delete fields in a salesforce custom object",
             inputSchema={
@@ -313,6 +384,267 @@ def get_tools():
                 },
                 "required": ["object_name", "record_id"]
             }
+        ),
+        types.Tool(
+            name="create_custom_fields",
+            description="Create one or more custom fields on a given object in salesforce",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the object to add fields to",
+                    },
+                    "plural_name": {
+                        "type": "string",
+                        "description": "The plural name of the object",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "The general description of the object purpose in a short sentence",
+                    },
+                    "api_name": {
+                        "type": "string",
+                        "description": "The api name of the object to add fields to",
+                    },
+                    "fields": {
+                        "type": "array",
+                        "description": "The fields to add to the object",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["Text", "Number", "Lookup", "LongText", "URL"],
+                                    "default": "Text",
+                                    "description": "The type of the field",
+                                 },
+                                "label": {
+                                    "type": "string",
+                                    "description": "The display name of the field",
+                                 },
+                                "api_name": {
+                                    "type": "string",
+                                    "description": "The api_name of the field finished in __c",
+                                 },
+                            },
+                            "additionalProperties": True,
+                        },
+                    },
+                },
+                "required": ["name", "plural_name", "api_name", "fields"],
+            },
+        ),
+        types.Tool(
+            name="define_tabs_on_app",
+            description="Defines or updates the tabs for an existing Lightning app.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "app_api_name": {
+                        "type": "string",
+                        "description": "The API name of the existing Lightning app to update."
+                    },
+                    "tabs": {
+                        "type": "array",
+                        "description": "List of tab API names to include in the app.",
+                        "items": { "type": "string" }
+                    },
+                    "append": {
+                        "type": "boolean",
+                        "description": "If true, append new tabs to existing ones. If false, replace all existing tabs.",
+                        "default": False
+                    }
+                },
+                "required": ["app_api_name", "tabs"]
+            }
+        ),
+        types.Tool(
+            name="create_report_folder",
+            description="Creates a new Report Folder in Salesforce via the Metadata API.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "folder_api_name": {"type": "string", "description": "The API name of the report folder to create (no spaces).", "pattern": "^[A-Za-z0-9_]+$", "examples": ["My_Reports"]},
+                    "folder_label": {"type": "string", "description": "The display label for the report folder.", "examples": ["My Reports"]},
+                    "access_type": {"type": "string", "description": "The access type for the folder. Use 'Public' or 'Private'.", "enum": ["Public","Private"], "default": "Private"}
+                },
+                "required": ["folder_api_name","folder_label"]
+            }
+        ),
+        types.Tool(
+            name="create_dashboard_folder",
+            description="Creates a new Dashboard Folder in Salesforce via the REST API.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "folder_api_name": {"type": "string", "description": "The API name of the dashboard folder to create (no spaces).", "pattern": "^[A-Za-z0-9_]+$", "examples": ["My_Dashboards"]},
+                    "folder_label": {"type": "string", "description": "The display label for the dashboard folder.", "examples": ["My Dashboards"]},
+                    "access_type": {"type": "string", "description": "The access type for the folder. Use 'Public' or 'Private'.", "enum": ["Public","Private"], "default": "Private"}
+                },
+                "required": ["folder_api_name","folder_label"]
+            }
+        ),
+        types.Tool(
+            name="create_validation_rule",
+            description="Creates a new Validation Rule on a specific object via the Tooling API.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "object_name": {"type": "string", "description": "API name of the object to add the rule to (e.g., 'Account')."},
+                    "rule_name": {"type": "string", "description": "Developer name for the validation rule (no .report or folder).", "pattern": "^[A-Za-z][A-Za-z0-9_]*$"},
+                    "active": {"type": "boolean", "description": "Whether the rule is active.", "default": True},
+                    "description": {"type": "string", "description": "Longer description of the rule (optional)."},
+                    "error_condition_formula": {"type": "string", "description": "Formula that triggers the rule when true."},
+                    "error_message": {"type": "string", "description": "Error message shown when rule fires.", "maxLength": 255},
+                    "error_display_field": {"type": "string", "description": "Field to display the error on (optional)."}
+                },
+                "required": ["object_name", "rule_name", "error_condition_formula", "error_message"]
+            }
+        ),
+        types.Tool(
+            name="create_custom_metadata_type",
+            description="Creates a new Custom Metadata Type via the Metadata API.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "api_name": {"type": "string", "pattern": "^[A-Za-z0-9_]+__mdt$", "description": "API name of the Custom Metadata Type (must end with __mdt)."},
+                    "label": {"type": "string", "description": "Label for the Custom Metadata Type."},
+                    "plural_name": {"type": "string", "description": "Plural label for the Custom Metadata Type."},
+                    "description": {"type": "string", "description": "Description of the Custom Metadata Type."},
+                    "fields": {
+                        "type": "array",
+                        "description": "List of fields for the Custom Metadata Type.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {"type": "string", "enum": ["Text", "Number", "Checkbox", "Date", "Picklist", "URL"], "default": "Text", "description": "Field data type."},
+                                "label": {"type": "string", "description": "Field label."},
+                                "api_name": {"type": "string", "description": "Field API name (must end with __c for custom metadata fields)."},
+                                "defaultValue": {
+                                    "type": "boolean",
+                                    "description": "The default value for a Checkbox field (true or false). Optional. Defaults to false if not provided."
+                                },
+                                "referenceTo": {
+                                    "type": "string",
+                                    "description": "The API name of the object this Lookup field references (e.g., 'Account', 'Contact', 'CustomObject__c'). Required for Lookup fields."
+                                },
+                                "relationshipLabel": {
+                                    "type": "string",
+                                    "description": "The label for the relationship (e.g., 'Account'). Optional for Lookup fields."
+                                },
+                                "relationshipName": {
+                                    "type": "string",
+                                    "description": "The API name for the relationship (e.g., 'Account'). Optional for Lookup fields."
+                                }
+                            },
+                            "required": ["type", "label", "api_name"]
+                        }
+                    }
+                },
+                "required": ["api_name", "label", "plural_name", "fields"]
+            }
+        ),
+        types.Tool(
+            name="create_lightning_page",
+            description="Creates a new Lightning App Page in Salesforce (currently always deploys a simple hardcoded page).",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "description": "The display label for the page."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional description for the Lightning Page."
+                    }
+                },
+                "required": ["label"]
+            }
+        ),
+        types.Tool(
+            name="describe_object",
+            description="Get detailed schema information for a Salesforce object, including fields, relationships, and picklist values. Returns markdown.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "object_name": {
+                        "type": "string",
+                        "description": "API name of the object (e.g., 'Account', 'Custom_Object__c')",
+                    },
+                    "include_field_details": {
+                        "type": "boolean",
+                        "description": "Whether to include detailed field information (default: true)",
+                        "default": True,
+                    },
+                },
+                "required": ["object_name"],
+            },
+        ),
+        types.Tool(
+            name="describe_relationship_fields",
+            description="Get all relationship fields for a Salesforce object, including parent (lookup/master-detail) and child relationships. Returns markdown.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "object_name": {
+                        "type": "string",
+                        "description": "API name of the object (e.g., 'Account', 'Custom_Object__c')",
+                    },
+                },
+                "required": ["object_name"],
+            },
+        ),
+        types.Tool(
+            name="get_fields_by_type",
+            description="Get fields of a specific type for a Salesforce object, or all fields if no type is specified. Returns a markdown table of field details.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "object_name": {
+                        "type": "string",
+                        "description": "API name of the object (e.g., 'Account', 'Custom_Object__c')",
+                    },
+                    "field_type": {
+                        "type": "string",
+                        "description": "Type to filter fields by (e.g., 'picklist', 'reference', etc.). If omitted, returns all fields.",
+                    },
+                },
+                "required": ["object_name"],
+            },
+        ),
+        types.Tool(
+            name="get_picklist_values",
+            description="Get picklist values for a specific Salesforce field, including value, label, default, and active status. Returns a markdown table.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "object_name": {
+                        "type": "string",
+                        "description": "API name of the object (e.g., 'Account', 'Custom_Object__c')",
+                    },
+                    "field_name": {
+                        "type": "string",
+                        "description": "API name of the picklist field (e.g., 'Industry', 'Status', 'Custom_Field__c')",
+                    },
+                },
+                "required": ["object_name", "field_name"],
+            },
+        ),
+        types.Tool(
+            name="get_validation_rules",
+            description="Get validation rules for a Salesforce object, including rule name, active status, error message, error field, and description. Returns a markdown table.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "object_name": {
+                        "type": "string",
+                        "description": "API name of the object (e.g., 'Account', 'Custom_Object__c')",
+                    },
+                },
+                "required": ["object_name"],
+            },
         ),
     ]
     

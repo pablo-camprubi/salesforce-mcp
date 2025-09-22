@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Template</fullName>
+    
+    <format>##format##</format>
+
+    <!-- Optional aggregates -->
+    ##aggregates##
+
+    <!-- Optional buckets -->
+    ##buckets##
+
+    <!-- Optional chart configuration -->
+    ##chart##
+
+    <!-- Detail (tabular) columns -->
+    ##detail_columns##
+
+    <!-- Filters -->
+    ##report_filters##
+
+    <!-- Across groupings (for matrix reports) -->
+    ##groupings_across##
+
+    <!-- Down groupings -->
+    ##groupings_down##
+
+    <!-- Report name and scope -->
+    <name>##report_name##</name>
+    <reportType>##report_type##</reportType>
+    <scope>##scope##</scope>
+    <showDetails>##show_details##</showDetails>
+    <!-- Time frame filter -->
+    <timeFrameFilter>
+        <dateColumn>##time_frame_column##</dateColumn>
+        <interval>##time_frame_interval##</interval>
+    </timeFrameFilter>
+</Report> 

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>58.0</apiVersion>
+    <description>##description##</description>
+    <label>##label##</label>
+    <processType>Flow</processType>
+    <status>Draft</status>
+    <triggerType>None</triggerType>
+    <environments>Default</environments>
+    <interviewLabel>##label## {!$Flow.CurrentDateTime}</interviewLabel>
+    <start>
+        <object>##object##</object>
+        <filterConditions>
+            <field>Id</field>
+            <operator>IsNull</operator>
+            <value>
+                <elementReference>Id</elementReference>
+            </value>
+        </filterConditions>
+        <connector>
+            <targetReference>##first_element##</targetReference>
+        </connector>
+    </start>
+</Flow> 
