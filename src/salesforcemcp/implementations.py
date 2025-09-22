@@ -9,7 +9,7 @@ import re
 import os
 import shutil
 
-def create_object_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, str]):
+def create_object_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]):
     name = arguments.get("name")
     plural_name = arguments.get("plural_name")
     api_name = arguments.get("api_name")
@@ -36,7 +36,7 @@ def create_object_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, s
         )
     ]
 
-def create_object_with_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, str]):
+def create_object_with_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]):
     name = arguments.get("name")
     plural_name = arguments.get("plural_name")
     api_name = arguments.get("api_name")
@@ -63,7 +63,7 @@ def create_object_with_fields_impl(sf_client: sfdc_client.OrgHandler, arguments:
         )
     ]
 
-def delete_object_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, str]):
+def delete_object_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]):
     api_name = arguments.get("api_name")
     fields = arguments.get("fields")
 
@@ -83,7 +83,7 @@ def delete_object_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict
         )
     ]
 
-def create_tab_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, str]):
+def create_tab_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]):
     args = arguments
     tab_api_name = args.get("tab_api_name")
     label = args.get("label")
@@ -139,7 +139,7 @@ def create_tab_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, str]
         print(f"Error during Custom Tab creation/deployment: {e}")
         raise ValueError(f"Failed to create or deploy Custom Tab '{tab_api_name}'. Error: {str(e)}")
 
-def create_custom_app_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, str]):
+def create_custom_app_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]):
         api_name = arguments.get("api_name")
         label = arguments.get("label")
         nav_type = arguments.get("nav_type", "Standard")
@@ -314,7 +314,7 @@ def delete_record_impl(sf_client: OrgHandler, arguments: dict[str, str]):
 
 # --- Additional Functions from SFDC-MCP ---
 
-def create_custom_fields_impl(sf_client: OrgHandler, arguments: dict[str, str]):
+def create_custom_fields_impl(sf_client: OrgHandler, arguments: dict[str, Any]):
     name = arguments.get("name")
     plural_name = arguments.get("plural_name")
     api_name = arguments.get("api_name")
