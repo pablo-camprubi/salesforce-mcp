@@ -9,9 +9,21 @@ from simple_salesforce import Salesforce
 from datetime import datetime
 import re
 import time
+import tempfile
 
 BASE_PATH = os.path.dirname(os.path.abspath(__file__))
 DEPLOY_DIR = "deployment_package"
+
+# Global variables for temp directories in serverless environments
+current_package_dir = None
+current_delete_dir = None
+
+# Use /tmp for serverless environments like Vercel
+def get_temp_dir(name="current"):
+    """Get a temporary directory that works in serverless environments"""
+    temp_dir = os.path.join(tempfile.gettempdir(), f"sf_metadata_{name}_{int(time.time())}")
+    os.makedirs(temp_dir, exist_ok=True)
+    return temp_dir
 
 def _clean_deploy_dir():
     """Removes and recreates the deployment directory."""
@@ -21,8 +33,10 @@ def _clean_deploy_dir():
     os.makedirs(deploy_path, exist_ok=True)
 
 def write_to_file(content):
-    with open(f"{BASE_PATH}/mylog.txt", 'a') as f:
-        f.write(content)
+    # Use temp file for logging in serverless environments
+    log_file = os.path.join(tempfile.gettempdir(), "sf_metadata.log")
+    with open(log_file, 'a') as f:
+        f.write(content + '\n')
 
 def create_metadata_package(json_obj):
     try:
@@ -32,20 +46,20 @@ def create_metadata_package(json_obj):
         api_name = json_obj["api_name"]
         fields = json_obj["fields"]
 
-        try:
-            shutil.rmtree(f"{BASE_PATH}/current/")
-        except:
-            print("the current directory doesn't exist")
-
+        # Use temporary directory for serverless environments
+        destination = get_temp_dir("current")
         source = f"{BASE_PATH}/assets/create_object_tmpl/"
-        destination = f"{BASE_PATH}/current/"
 
-        shutil.copytree(source, destination)
+        shutil.copytree(source, destination, dirs_exist_ok=True)
 
-        old_name = f"{BASE_PATH}/current/objects/##api_name##.object"
-        new_name = f"{BASE_PATH}/current/objects/{api_name}.object"
+        old_name = f"{destination}/objects/##api_name##.object"
+        new_name = f"{destination}/objects/{api_name}.object"
 
         os.rename(old_name, new_name)
+        
+        # Store destination path for later use
+        global current_package_dir
+        current_package_dir = destination
 
         with open(f"{BASE_PATH}/assets/field.tmpl", "r", encoding="utf-8") as file:
             field_tmpl = file.read()
@@ -136,10 +150,10 @@ def create_metadata_package(json_obj):
     <version>63.0</version>
 </Package>""".format(api_name=api_name)
 
-        with open(f"{BASE_PATH}/current/package.xml", "w", encoding="utf-8") as file:
+        with open(f"{destination}/package.xml", "w", encoding="utf-8") as file:
             file.write(package_xml)
 
-        obj_path = f"{BASE_PATH}/current/objects/{api_name}.object"
+        obj_path = f"{destination}/objects/{api_name}.object"
 
         with open(obj_path, "r", encoding="utf-8") as file:
             obj_tmpl = file.read()
@@ -156,7 +170,7 @@ def create_metadata_package(json_obj):
             file.write(obj_tmpl)
 
         # Create profiles directory in the deployment package
-        profiles_dir = os.path.join(f"{BASE_PATH}/current", "profiles")
+        profiles_dir = os.path.join(destination, "profiles")
         os.makedirs(profiles_dir, exist_ok=True)
 
         # Create field permissions XML
@@ -397,25 +411,19 @@ def create_custom_app_package(json_obj):
         setup_experience = "all"
 
     # --- Prepare environment --- 
-    try:
-        shutil.rmtree(f"{BASE_PATH}/current/")
-    except FileNotFoundError:
-        print("The 'current' directory doesn't exist, proceeding.")
-    except Exception as e:
-        print(f"Error removing directory: {e}")
-        return
-
+    global current_package_dir
+    current_package_dir = get_temp_dir("custom_app")
+    
     source_tmpl_dir = f"{BASE_PATH}/assets/create_custom_app_tmpl/"
-    destination = f"{BASE_PATH}/current/"
     try:
-        shutil.copytree(source_tmpl_dir, destination)
+        shutil.copytree(source_tmpl_dir, current_package_dir, dirs_exist_ok=True)
     except Exception as e:
         print(f"Error copying template directory: {e}")
         return
         
     # Rename app template file
-    old_app_file = f"{destination}/applications/Template.app-meta.xml"
-    new_app_file = f"{destination}/applications/{api_name}.app-meta.xml"
+    old_app_file = f"{current_package_dir}/applications/Template.app-meta.xml"
+    new_app_file = f"{current_package_dir}/applications/{api_name}.app-meta.xml"
     try:
         # Ensure directory exists (needed if copytree didn't create it fully)
         os.makedirs(os.path.dirname(new_app_file), exist_ok=True) 
@@ -645,8 +653,12 @@ def deploy(b64, sf):
 
 def create_send_to_server(sf):
     """Zips the current package and sends it for deployment using the provided sf connection."""
+    global current_package_dir
+    if current_package_dir is None:
+        raise ValueError("No package directory available for deployment")
+    
     # First, deploy the CustomApplication
-    zip_directory(f"{BASE_PATH}/current")
+    zip_directory(current_package_dir)
     b64 = binary_to_base64(f"{BASE_PATH}/pack.zip")
     deploy(b64, sf)
 
@@ -656,16 +668,16 @@ def create_send_to_server(sf):
     # Now update package.xml to include the Profile
     package_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Package xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <types>\n        <members>Admin</members>\n        <name>Profile</name>\n    </types>\n    <version>63.0</version>\n</Package>"""
 
-    with open(os.path.join(f"{BASE_PATH}/current", "package.xml"), "w", encoding="utf-8") as f:
+    with open(os.path.join(current_package_dir, "package.xml"), "w", encoding="utf-8") as f:
         f.write(package_xml)
 
     # Ensure the profile XML has the correct API name and app visibility
-    profiles_dir = os.path.join(f"{BASE_PATH}/current", "profiles")
+    profiles_dir = os.path.join(current_package_dir, "profiles")
     profile_file = os.path.join(profiles_dir, "Admin.profile-meta.xml")
 
     # Get the app API name from the current app package
     # (Assume only one app in current/applications/)
-    applications_dir = os.path.join(f"{BASE_PATH}/current", "applications")
+    applications_dir = os.path.join(current_package_dir, "applications")
     app_api_name = None
     if os.path.exists(applications_dir):
         for fname in os.listdir(applications_dir):
