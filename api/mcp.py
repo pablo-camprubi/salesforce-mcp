@@ -1,35 +1,43 @@
 import json
 import sys
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from http.server import BaseHTTPRequestHandler
 
-# Add the src directory to the Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
+# Add the src directory to the Python path for local imports
+current_dir = os.path.dirname(__file__)
+src_path = os.path.join(current_dir, '..', 'src')
+sys.path.insert(0, src_path)
 
+# Import handling with fallbacks for serverless environment
 try:
     import salesforcemcp.sfdc_client as sfdc_client
     import salesforcemcp.definitions as sfmcpdef
     import salesforcemcp.implementations as sfmcpimpl
-    # Use minimal types instead of full MCP library for serverless compatibility
-    from . import types_minimal as types
+    print("Successfully imported Salesforce MCP modules")
 except ImportError as e:
-    print(f"Import error: {e}")
-    # For development/testing when modules might not be available
+    print(f"Import error for MCP modules: {e}")
     sfdc_client = None
     sfmcpdef = None
     sfmcpimpl = None
-    
-    # Create minimal types fallback
-    class TextContent:
-        def __init__(self, type: str, text: str):
-            self.type = type
-            self.text = text
-    
-    class types:
-        TextContent = TextContent
 
-def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_credentials: Optional[str] = None, request_headers: Optional[Dict[str, str]] = None) -> Optional[sfdc_client.OrgHandler]:
+# Minimal types for MCP compatibility
+class TextContent:
+    def __init__(self, type: str, text: str):
+        self.type = type
+        self.text = text
+
+class Tool:
+    def __init__(self, name: str, description: str, inputSchema: dict):
+        self.name = name
+        self.description = description
+        self.inputSchema = inputSchema
+
+class types:
+    TextContent = TextContent
+    Tool = Tool
+
+def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_credentials: Optional[str] = None, request_headers: Optional[Dict[str, str]] = None):
     """Get a fresh Salesforce client connection with provided or inferred credentials.
     
     Args:
