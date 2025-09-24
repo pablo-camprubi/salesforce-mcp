@@ -211,8 +211,8 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests - health check and SSE connection"""
         try:
-            # Handle save-credentials endpoint
-            if self.path == '/save-credentials':
+            # Handle save-credentials endpoint (multiple paths for compatibility)
+            if self.path in ['/save-credentials', '/api/salesforce/save-credentials']:
                 # This endpoint is used by clients to test credential saving
                 response = {
                     "status": "success",
@@ -272,8 +272,8 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         """Handle POST requests - MCP JSON-RPC and credential saving"""
         try:
-            # Handle save-credentials endpoint
-            if self.path == '/save-credentials':
+            # Handle save-credentials endpoint (multiple paths for compatibility)
+            if self.path in ['/save-credentials', '/api/salesforce/save-credentials']:
                 content_length = int(self.headers.get('Content-Length', 0))
                 if content_length > 0:
                     post_data = self.rfile.read(content_length)
