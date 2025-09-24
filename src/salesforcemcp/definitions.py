@@ -646,6 +646,94 @@ def get_tools():
                 "required": ["object_name"],
             },
         ),
+        # Einstein Studio Model Tools
+        types.Tool(
+            name="create_einstein_model",
+            description="Create an Einstein Studio model using AppFrameworkTemplateBundle",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_name": {
+                        "type": "string",
+                        "description": "The name/label of the Einstein Studio model",
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Description of what the model predicts or analyzes",
+                    },
+                    "model_capability": {
+                        "type": "string",
+                        "description": "The capability of the model",
+                        "enum": ["BinaryClassification", "Regression", "MultiClassification"],
+                        "default": "BinaryClassification"
+                    },
+                    "outcome_field": {
+                        "type": "string",
+                        "description": "The field name that represents the outcome/target variable (e.g., 'Converted__c')",
+                    },
+                    "goal": {
+                        "type": "string", 
+                        "description": "The goal for the outcome",
+                        "enum": ["Maximize", "Minimize"],
+                        "default": "Maximize"
+                    },
+                    "data_source": {
+                        "type": "string",
+                        "description": "The name of the data model object to use as training data (e.g., 'Lead_Model_Training__dlm')",
+                    },
+                    "success_value": {
+                        "type": "string",
+                        "description": "The value that represents success for binary classification (e.g., 'true')",
+                        "default": "true"
+                    },
+                    "failure_value": {
+                        "type": "string", 
+                        "description": "The value that represents failure for binary classification (e.g., 'false')",
+                        "default": "false"
+                    },
+                    "algorithm_type": {
+                        "type": "string",
+                        "description": "The algorithm to use for the model",
+                        "enum": ["XGBoost", "LinearRegression", "LogisticRegression"],
+                        "default": "XGBoost"
+                    },
+                    "fields": {
+                        "type": "array",
+                        "description": "The fields to include in the model for prediction",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "field_name": {
+                                    "type": "string",
+                                    "description": "The API name of the field",
+                                },
+                                "field_label": {
+                                    "type": "string",
+                                    "description": "The display label of the field",
+                                },
+                                "field_type": {
+                                    "type": "string",
+                                    "enum": ["Text", "Number"],
+                                    "description": "The type of the field",
+                                },
+                                "data_type": {
+                                    "type": "string", 
+                                    "enum": ["Categorical", "Numerical"],
+                                    "description": "How the field should be treated in the model",
+                                },
+                                "ignored": {
+                                    "type": "boolean",
+                                    "description": "Whether to ignore this field in the model",
+                                    "default": False
+                                }
+                            },
+                            "required": ["field_name", "field_label", "field_type", "data_type"]
+                        }
+                    }
+                },
+                "required": ["model_name", "description", "outcome_field", "data_source", "fields"]
+            },
+        ),
     ]
     
     return tools

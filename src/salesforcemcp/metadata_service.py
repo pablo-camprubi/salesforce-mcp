@@ -11,8 +11,28 @@ import re
 import time
 import tempfile
 
-BASE_PATH = os.path.dirname(os.path.abspath(__file__))
+# Use paths that work in both local and serverless environments
+BASE_PATH = tempfile.gettempdir()  # Always use /tmp for writes
 DEPLOY_DIR = "deployment_package"
+
+# For reading assets, try multiple possible locations
+def get_assets_path():
+    """Find the assets directory in various possible locations"""
+    possible_paths = [
+        os.path.join(os.path.dirname(__file__), '..', 'assets'),  # Local development
+        os.path.join('/var/task/src', 'assets'),  # Vercel serverless
+        os.path.join('/var/task', 'src', 'assets'),  # Alternative Vercel path
+        os.path.join(os.path.dirname(__file__), 'assets'),  # Direct relative
+    ]
+    
+    for path in possible_paths:
+        abs_path = os.path.abspath(path)
+        if os.path.exists(abs_path):
+            print(f"Found assets at: {abs_path}")
+            return abs_path
+    
+    print(f"❌ Assets directory not found! Tried: {possible_paths}")
+    raise FileNotFoundError("Assets directory not found in any expected location")
 
 # Global variables for temp directories in serverless environments
 current_package_dir = None
@@ -22,7 +42,7 @@ current_delete_dir = None
 def get_temp_dir(name="current"):
     """Get a temporary directory that works in serverless environments"""
     temp_dir = os.path.join(tempfile.gettempdir(), f"sf_metadata_{name}_{int(time.time())}")
-    os.makedirs(temp_dir, exist_ok=True)
+    # Don't create the directory - let copytree create it
     return temp_dir
 
 def _clean_deploy_dir():
@@ -48,7 +68,10 @@ def create_metadata_package(json_obj):
 
         # Use temporary directory for serverless environments
         destination = get_temp_dir("current")
-        source = f"{BASE_PATH}/assets/create_object_tmpl/"
+        
+        # Use the assets path finder instead of hardcoded path
+        assets_path = get_assets_path()
+        source = os.path.join(assets_path, "create_object_tmpl")
 
         shutil.copytree(source, destination, dirs_exist_ok=True)
 
@@ -61,7 +84,9 @@ def create_metadata_package(json_obj):
         global current_package_dir
         current_package_dir = destination
 
-        with open(f"{BASE_PATH}/assets/field.tmpl", "r", encoding="utf-8") as file:
+        # Use assets path finder for field template
+        field_tmpl_path = os.path.join(get_assets_path(), "field.tmpl")
+        with open(field_tmpl_path, "r", encoding="utf-8") as file:
             field_tmpl = file.read()
 
         fields_str = ""
@@ -75,8 +100,7 @@ def create_metadata_package(json_obj):
             f_api_name = field["api_name"]
             field_names.append(f_api_name)  # Add field name to list
 
-            with open(f"{BASE_PATH}/check.txt", 'a') as f:
-                f.write("1")
+            # Debug log removed for serverless compatibility
 
             if f_type == "Text":
                 type_def = """<type>Text</type>\n                    <length>100</length>"""
@@ -96,8 +120,7 @@ def create_metadata_package(json_obj):
                     type_def += f"\n                    <relationshipName>{relationship_name}</relationshipName>"
             else:
                 if f_type == "Picklist":
-                    with open(f"{BASE_PATH}/check.txt", 'a') as f:
-                        f.write("2")
+                    # Debug log removed for serverless compatibility
 
                     f_picklist_values = field["picklist_values"]
 
@@ -122,8 +145,7 @@ def create_metadata_package(json_obj):
                         </valueSet>
                         """
                 else:
-                    with open(f"{BASE_PATH}/check.txt", 'a') as f:
-                        f.write("4")
+                    # Debug log removed for serverless compatibility
                     type_def = """<precision>18</precision>
                         <scale>0</scale>
                         <type>Number</type>"""
@@ -133,8 +155,8 @@ def create_metadata_package(json_obj):
             new_field = new_field.replace("##type##", type_def)
             fields_str = fields_str + new_field
 
-        with open(f"{BASE_PATH}/fields_str.txt", 'a') as f:
-            f.write(json.dumps(fields_str))
+        # Debug log removed for serverless compatibility
+        print(f"Generated fields metadata: {len(fields)} fields")
 
         # Update package.xml to include both object and profile
         package_xml = """<?xml version="1.0" encoding="UTF-8"?>
@@ -184,7 +206,8 @@ def create_metadata_package(json_obj):
 """
 
         # Create profile XML using template
-        with open(os.path.join(BASE_PATH, "assets", "profile.tmpl"), "r", encoding="utf-8") as f:
+        profile_tmpl_path = os.path.join(get_assets_path(), "profile.tmpl")
+        with open(profile_tmpl_path, "r", encoding="utf-8") as f:
             profile_template = f.read()
 
         profile_xml = profile_template.replace("##fieldPermissions##", field_permissions)
@@ -195,8 +218,7 @@ def create_metadata_package(json_obj):
 
     except Exception as e:
         err_msg = f"An error occurred: {e}"
-        with open(f"{BASE_PATH}/check.txt", 'a') as f:
-            f.write(err_msg)
+        print(f"Metadata package error: {err_msg}")  # Use print instead of file write
 
 
 def delete_fields(json_obj):
@@ -209,22 +231,25 @@ def delete_fields(json_obj):
         field_name = field["api_name"]
         members = members + f"<members>{api_name}.{field_name}</members>\n"
 
-    try:
-        shutil.rmtree(f"{BASE_PATH}/current_delete/")
-    except:
-        print("the current directory doesn't exist")
+    # No need to clean up - using fresh temp directories
 
-    source = f"{BASE_PATH}/assets/delete_fields_tmpl/"
-    destination = f"{BASE_PATH}/current_delete/"
+    # Use assets path finder and temp directory
+    assets_path = get_assets_path()
+    source = os.path.join(assets_path, "delete_fields_tmpl")
+    destination = get_temp_dir("current_delete")
+    
+    # Store destination path for later use
+    global current_delete_dir
+    current_delete_dir = destination
 
-    shutil.copytree(source, destination)
+    shutil.copytree(source, destination, dirs_exist_ok=True)
 
-    with open(f"{BASE_PATH}/current_delete/destructiveChanges.xml", "r", encoding="utf-8") as file:
+    with open(f"{destination}/destructiveChanges.xml", "r", encoding="utf-8") as file:
         destructive = file.read()
 
     destructive = destructive.replace("##fields##", members)
         
-    with open(f"{BASE_PATH}/current_delete/destructiveChanges.xml", "w", encoding="utf-8") as file:
+    with open(f"{destination}/destructiveChanges.xml", "w", encoding="utf-8") as file:
         file.write(destructive)
 
 def create_tab_package(json_obj):
@@ -255,19 +280,19 @@ def create_tab_package(json_obj):
     # Add motif format validation if needed
 
     # --- Prepare Environment (keep this) --- 
-    try:
-        shutil.rmtree(f"{BASE_PATH}/current/")
-    except FileNotFoundError:
-        print("The 'current' directory doesn't exist, proceeding.")
-    except Exception as e:
-        print(f"Error removing directory: {e}")
-        return
+    # No need to clean up - using fresh temp directories
 
-    source = f"{BASE_PATH}/assets/create_tab_tmpl/"
-    destination = f"{BASE_PATH}/current/"
+    # Use assets path finder and temp directory
+    assets_path = get_assets_path()
+    source = os.path.join(assets_path, "create_tab_tmpl")
+    destination = get_temp_dir("current")
+    
+    # Store destination path for later use
+    global current_package_dir
+    current_package_dir = destination
 
     try:
-        shutil.copytree(source, destination)
+        shutil.copytree(source, destination, dirs_exist_ok=True)
     except Exception as e:
         print(f"Error copying template directory: {e}")
         return
@@ -364,7 +389,8 @@ def create_tab_package(json_obj):
             tree.write(profile_file, encoding='utf-8', xml_declaration=True)
     else:
         # Use template as before
-        with open(os.path.join(BASE_PATH, "assets", "profile.tmpl"), "r", encoding="utf-8") as f:
+        profile_tmpl_path = os.path.join(get_assets_path(), "profile.tmpl")
+        with open(profile_tmpl_path, "r", encoding="utf-8") as f:
             profile_template = f.read()
         profile_xml = profile_template.replace("##fieldPermissions##", "")
         profile_xml = profile_xml.replace("##tabVisibilities##", tab_visibility_xml)
@@ -414,7 +440,8 @@ def create_custom_app_package(json_obj):
     global current_package_dir
     current_package_dir = get_temp_dir("custom_app")
     
-    source_tmpl_dir = f"{BASE_PATH}/assets/create_custom_app_tmpl/"
+    assets_path = get_assets_path()
+    source_tmpl_dir = os.path.join(assets_path, "create_custom_app_tmpl")
     try:
         shutil.copytree(source_tmpl_dir, current_package_dir, dirs_exist_ok=True)
     except Exception as e:
@@ -442,7 +469,7 @@ def create_custom_app_package(json_obj):
     <version>63.0</version>
 </Package>""".format(api_name=api_name)
 
-    with open(os.path.join(destination, "package.xml"), "w", encoding="utf-8") as f:
+    with open(os.path.join(current_package_dir, "package.xml"), "w", encoding="utf-8") as f:
         f.write(package_xml)
         
     # --- Prepare App XML using Template --- 
@@ -455,17 +482,13 @@ def create_custom_app_package(json_obj):
             "##api_name##": api_name,
             "##label##": label,
             "##description##": description or "",
+            "##nav_type##": nav_type,
+            "##setup_experience##": setup_experience,
         }
 
         # Replace all placeholders
         for key, value in replacements.items():
             app_tmpl = app_tmpl.replace(key, value)
-        
-        # Set navType based on the provided value
-        app_tmpl = app_tmpl.replace("<navType>Standard</navType>", f"<navType>{nav_type}</navType>")
-        
-        # Set setupExperience based on the provided value
-        app_tmpl = app_tmpl.replace("<setupExperience>all</setupExperience>", f"<setupExperience>{setup_experience}</setupExperience>")
         
         # Generate brand XML (optional)
         brand_xml = ""
@@ -500,11 +523,12 @@ def create_custom_app_package(json_obj):
         print(f"Custom App XML generated and written to: {new_app_file}")
 
         # Create profiles directory with proper structure
-        profiles_dir = os.path.join(destination, "profiles")
+        profiles_dir = os.path.join(current_package_dir, "profiles")
         os.makedirs(profiles_dir, exist_ok=True)
 
         # Read the profile template
-        with open(os.path.join(BASE_PATH, "assets", "create_custom_app_tmpl", "profiles", "Admin.profile-meta.xml"), "r", encoding="utf-8") as f:
+        profile_tmpl_path = os.path.join(assets_path, "create_custom_app_tmpl", "profiles", "Admin.profile-meta.xml")
+        with open(profile_tmpl_path, "r", encoding="utf-8") as f:
             profile_template = f.read()
 
         # Replace the API name in the profile template
@@ -657,16 +681,9 @@ def create_send_to_server(sf):
     if current_package_dir is None:
         raise ValueError("No package directory available for deployment")
     
-    # First, deploy the CustomApplication
-    zip_directory(current_package_dir)
-    b64 = binary_to_base64(f"{BASE_PATH}/pack.zip")
-    deploy(b64, sf)
-
-    # Wait longer for the CustomApplication to be fully created
-    time.sleep(15)  # Increased wait time to ensure app is fully created
-
-    # Now update package.xml to include the Profile
-    package_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Package xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <types>\n        <members>Admin</members>\n        <name>Profile</name>\n    </types>\n    <version>63.0</version>\n</Package>"""
+    # Deploy both CustomApplication and Profile in a single package to avoid dependency issues
+    # Update package.xml to include both CustomApplication and Profile
+    package_xml = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Package xmlns=\"http://soap.sforce.com/2006/04/metadata\">\n    <types>\n        <members>*</members>\n        <name>CustomApplication</name>\n    </types>\n    <types>\n        <members>Admin</members>\n        <name>Profile</name>\n    </types>\n    <version>63.0</version>\n</Package>"""
 
     with open(os.path.join(current_package_dir, "package.xml"), "w", encoding="utf-8") as f:
         f.write(package_xml)
@@ -712,14 +729,19 @@ def create_send_to_server(sf):
         with open(profile_file, "w", encoding="utf-8") as f:
             f.write(profile_content)
 
-    # Deploy the Profile
-    zip_directory(f"{BASE_PATH}/current")
+    # Deploy both CustomApplication and Profile in a single deployment
+    zip_directory(current_package_dir)
     b64 = binary_to_base64(f"{BASE_PATH}/pack.zip")
     deploy(b64, sf)
+    print("✅ Custom Application and Profile deployed together successfully")
 
 def delete_send_to_server(sf):
     """Zips the current delete package and sends it for deployment using the provided sf connection."""
-    zip_directory(f"{BASE_PATH}/current_delete")
+    global current_delete_dir
+    if current_delete_dir is None:
+        raise ValueError("No delete package directory available for deployment")
+    
+    zip_directory(current_delete_dir)
     b64 = binary_to_base64(f"{BASE_PATH}/pack.zip")
     deploy(b64, sf) # Pass sf connection
 
@@ -737,7 +759,8 @@ def create_report_package(report_info: dict):
     write_to_file(f"Creating report package for: {report_name} in folder {folder_name}")
 
     # Paths
-    source_tmpl_dir = os.path.join(BASE_PATH, "assets", "create_report_tmpl")
+    assets_path = get_assets_path()
+    source_tmpl_dir = os.path.join(assets_path, "create_report_tmpl")
     deploy_dir = os.path.join(BASE_PATH, DEPLOY_DIR)
     reports_dir = os.path.join(deploy_dir, "reports")
     package_tmpl = os.path.join(source_tmpl_dir, "package.xml")
@@ -847,6 +870,30 @@ def deploy_package_from_deploy_dir(sf):
     b64 = binary_to_base64(zip_path)
     deploy(b64, sf)
 
+def deploy_object_package(sf):
+    """Simple deployment for custom objects - no app-specific logic"""
+    global current_package_dir
+    if current_package_dir is None:
+        raise ValueError("No package directory available for deployment")
+    
+    # Simple deployment without app-specific logic
+    zip_directory(current_package_dir)
+    b64 = binary_to_base64(f"{BASE_PATH}/pack.zip")
+    deploy(b64, sf)
+    print("✅ Object package deployed successfully")
+
+def deploy_tab_package(sf):
+    """Simple deployment for custom tabs - no app-specific logic"""
+    global current_package_dir
+    if current_package_dir is None:
+        raise ValueError("No package directory available for deployment")
+    
+    # Simple deployment without app-specific logic
+    zip_directory(current_package_dir)
+    b64 = binary_to_base64(f"{BASE_PATH}/pack.zip")
+    deploy(b64, sf)
+    print("✅ Tab package deployed successfully")
+
 def create_report_folder_package(json_obj):
     """Prepares the deployment package for a new Salesforce report folder."""
     folder_api_name = json_obj.get('folder_api_name')
@@ -854,7 +901,8 @@ def create_report_folder_package(json_obj):
     access_type = json_obj.get('access_type', 'Private')
     # Prepare directory
     _clean_deploy_dir()
-    source_tmpl_dir = os.path.join(BASE_PATH, 'assets', 'create_report_folder_tmpl')
+    assets_path = get_assets_path()
+    source_tmpl_dir = os.path.join(assets_path, 'create_report_folder_tmpl')
     deploy_dir = os.path.join(BASE_PATH, DEPLOY_DIR)
     reportFolders_dir = os.path.join(deploy_dir, 'reportFolders')
     # Copy template structure
@@ -921,7 +969,8 @@ def create_profile_permissions_package(object_name: str, fields: list):
 """
     
     # Read the profile template
-    with open(os.path.join(BASE_PATH, "assets", "profile.tmpl"), "r", encoding="utf-8") as f:
+    profile_tmpl_path = os.path.join(get_assets_path(), "profile.tmpl")
+    with open(profile_tmpl_path, "r", encoding="utf-8") as f:
         profile_template = f.read()
     
     # Replace the fieldPermissions placeholder with our new permissions
@@ -943,7 +992,8 @@ def deploy_hardcoded_lightning_page(page_label="Simple Lightning App Page", desc
         # Generate a unique API name from the label
         api_name = page_label.replace(" ", "_") + "_" + str(int(time.time()))
         
-        asset_path = os.path.join(BASE_PATH, "assets", "Flexipages", "HardcodedPage.flexipage")
+        assets_path = get_assets_path()
+        asset_path = os.path.join(assets_path, "Flexipages", "HardcodedPage.flexipage")
         with open(asset_path, "r", encoding="utf-8") as asset_file:
             flexipage_xml = asset_file.read()
         

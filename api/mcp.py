@@ -20,57 +20,99 @@ except ImportError as e:
     sfmcpimpl = None
     types = None
 
-# Salesforce client will be initialized per request
-def get_sf_client():
-    """Get a fresh Salesforce client connection"""
+def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_credentials: Optional[str] = None, request_headers: Optional[Dict[str, str]] = None) -> Optional[sfdc_client.OrgHandler]:
+    """Get a fresh Salesforce client connection with provided or inferred credentials.
+    
+    Args:
+        credentials: Dict with username, password, security_token
+        encrypted_credentials: Base64 encoded encrypted credentials  
+        request_headers: HTTP headers that might contain credentials
+        
+    Returns:
+        OrgHandler instance with established connection or None if failed
+    """
     if not sfdc_client:
         print("ERROR: sfdc_client module not available")
         raise ValueError("Salesforce client module not initialized")
     
-    import os
-    # Debug environment variables - use working variable names
-    username = os.getenv("USERNAME")
-    password = os.getenv("PASSWORD") 
-    security_token = os.getenv("SECURITY_TOKEN")
-    
-    # Enhanced debugging
-    print(f"=== Salesforce Connection Debug ===")
-    print(f"Environment check - USERNAME: {'SET' if username else 'MISSING'}")
-    print(f"Environment check - PASSWORD: {'SET' if password else 'MISSING'}")  
-    print(f"Environment check - SECURITY_TOKEN: {'SET' if security_token else 'EMPTY (trusted IP)'}")
-    
-    if not username:
-        raise ValueError("USERNAME environment variable is required but not set")
-    if not password:
-        raise ValueError("PASSWORD environment variable is required but not set")
-    
-    # SECURITY_TOKEN can be empty for trusted IP ranges
-    if security_token is None:
-        security_token = ""
-        print("  SECURITY_TOKEN not set, using empty string (for trusted IP ranges)")
-    elif security_token == "":
-        print("  SECURITY_TOKEN is empty (for trusted IP ranges)")
+    client = sfdc_client.OrgHandler()
     
     try:
-        print("Creating OrgHandler...")
-        client = sfdc_client.OrgHandler()
-        print("OrgHandler created, attempting connection...")
-        
-        connection_result = client.establish_connection()
-        if connection_result:
-            print("✅ Salesforce connection established successfully")
+        # Priority order: encrypted_credentials, credentials, headers, environment variables
+        if encrypted_credentials:
+            print("🔐 Using encrypted credentials from request")
+            if not client.establish_connection_with_encrypted_credentials(encrypted_credentials):
+                print("❌ Failed to establish connection with encrypted credentials")
+                return None
+                
+        elif credentials:
+            print("🔑 Using plain credentials from request")
+            if not client.establish_connection(
+                username=credentials.get('username'),
+                password=credentials.get('password'),
+                security_token=credentials.get('security_token')
+            ):
+                print("❌ Failed to establish connection with provided credentials")
+                return None
+                
+        elif request_headers:
+            # Check for credentials in headers (for platform integration)
+            auth_header = request_headers.get('Authorization', '')
+            sf_credentials_header = request_headers.get('X-Salesforce-Credentials', '')
+            sf_encrypted_header = request_headers.get('X-Salesforce-Encrypted-Credentials', '')
+            
+            if sf_encrypted_header:
+                print("🔐 Using encrypted credentials from X-Salesforce-Encrypted-Credentials header")
+                if not client.establish_connection_with_encrypted_credentials(sf_encrypted_header):
+                    print("❌ Failed to establish connection with encrypted credentials from header")
+                    return None
+            elif sf_credentials_header:
+                print("🔑 Using credentials from X-Salesforce-Credentials header")
+                try:
+                    header_credentials = json.loads(sf_credentials_header)
+                    if not client.establish_connection(
+                        username=header_credentials.get('username'),
+                        password=header_credentials.get('password'),
+                        security_token=header_credentials.get('security_token')
+                    ):
+                        print("❌ Failed to establish connection with credentials from header")
+                        return None
+                except json.JSONDecodeError as e:
+                    print(f"❌ Invalid JSON in X-Salesforce-Credentials header: {e}")
+                    return None
+            else:
+                # Fall back to environment variables
+                print("🌍 Falling back to environment variables")
+                import os
+                username = os.getenv("USERNAME")
+                password = os.getenv("PASSWORD") 
+                security_token = os.getenv("SECURITY_TOKEN", "")
+                
+                print(f"Environment check - USERNAME: {'SET' if username else 'MISSING'}")
+                print(f"Environment check - PASSWORD: {'SET' if password else 'MISSING'}")  
+                print(f"Environment check - SECURITY_TOKEN: {'SET' if security_token else 'EMPTY (trusted IP)'}")
+                
+                if not client.establish_connection():
+                    print("❌ Failed to establish connection with environment variables")
+                    return None
+        else:
+            # Fall back to environment variables
+            print("🌍 Using environment variables (no credentials provided)")
+            if not client.establish_connection():
+                print("❌ Failed to establish connection with environment variables")
+                return None
+                
+        print("✅ Salesforce connection established successfully")
+        if client.connection:
             print(f"Session ID: {client.connection.session_id[:10]}...")
             print(f"Instance: {client.connection.sf_instance}")
-            return client
-        else:
-            print("❌ Failed to establish Salesforce connection - establish_connection returned False")
-            raise ValueError("Salesforce authentication failed - check credentials")
-            
+        return client
+        
     except Exception as e:
         print(f"❌ Exception creating Salesforce client: {str(e)}")
         import traceback
         print(f"Traceback: {traceback.format_exc()}")
-        raise ValueError(f"Salesforce connection failed: {str(e)}")
+        return None
 
 def send_json_rpc_response(request_id: Any, result: Any = None, error: Dict[str, Any] = None) -> Dict[str, Any]:
     """Create a JSON-RPC 2.0 response"""
@@ -120,7 +162,7 @@ def handle_initialize(request_id: Any, params: Dict[str, Any]):
     }
     return send_json_rpc_response(request_id, result)
 
-def handle_health_check(request_id: Any, params: Dict[str, Any]):
+def handle_health_check(request_id: Any, params: Dict[str, Any], request_headers: Optional[Dict[str, str]] = None):
     """Handle health check - useful for debugging server state"""
     import os
     
@@ -130,19 +172,32 @@ def handle_health_check(request_id: Any, params: Dict[str, Any]):
         "environment_variables": {
             "USERNAME": "SET" if os.getenv("USERNAME") else "MISSING",
             "PASSWORD": "SET" if os.getenv("PASSWORD") else "MISSING", 
-            "SECURITY_TOKEN": "SET" if os.getenv("SECURITY_TOKEN") else "EMPTY (trusted IP)"
+            "SECURITY_TOKEN": "SET" if os.getenv("SECURITY_TOKEN") else "EMPTY (trusted IP)",
+            "ENCRYPTION_KEY": "SET" if os.getenv("ENCRYPTION_KEY") else "MISSING"
         },
         "modules": {
             "sfdc_client": sfdc_client is not None,
             "sfmcpdef": sfmcpdef is not None,
             "sfmcpimpl": sfmcpimpl is not None,
             "types": types is not None
+        },
+        "multi_user_support": {
+            "enabled": True,
+            "credential_sources": ["encrypted_credentials", "plain_credentials", "headers", "environment"]
         }
     }
     
-    # Try Salesforce connection
+    # Try Salesforce connection with available credentials
     try:
-        client = get_sf_client()
+        # Check for credentials in params (for testing)
+        credentials = params.get('credentials')
+        encrypted_credentials = params.get('encrypted_credentials')
+        
+        client = get_sf_client(
+            credentials=credentials,
+            encrypted_credentials=encrypted_credentials, 
+            request_headers=request_headers
+        )
         if client and client.connection:
             health_data["salesforce_connection"] = {
                 "status": "connected",
@@ -158,31 +213,18 @@ def handle_health_check(request_id: Any, params: Dict[str, Any]):
     
     return send_json_rpc_response(request_id, health_data)
 
-def handle_list_tools(request_id: Any, params: Dict[str, Any]):
+def handle_list_tools(request_id: Any, params: Dict[str, Any], request_headers: Optional[Dict[str, str]] = None):
     """Handle the tools/list method"""
     if not sfmcpdef:
         return send_error(-32603, "Server not properly initialized", request_id)
         
     try:
         all_tools = sfmcpdef.get_tools()
-        client = get_sf_client()
-        is_connected = client and client.metadata_cache is not None
         
-        if is_connected:
-            tools = all_tools
-        else:
-            print("Salesforce connection inactive. Filtering available tools.")
-            live_connection_tools = {
-                "create_record", "delete_object_fields", "create_tab", "create_custom_app", "create_object_with_fields",
-                "create_custom_fields", "define_tabs_on_app", "create_report_folder", "create_dashboard_folder",
-                "create_validation_rule", "create_custom_metadata_type", "create_lightning_page", "describe_object",
-                "describe_relationship_fields", "get_fields_by_type", "get_picklist_values", "get_validation_rules"
-            }
-            tools = [tool for tool in all_tools if tool.name not in live_connection_tools]
-        
-        # Convert tools to dictionary format
+        # For multi-user MCP server, return all tools since each request can have its own credentials
+        # Tools that require connection will fail gracefully if no valid credentials are provided
         tools_dict = []
-        for tool in tools:
+        for tool in all_tools:
             tools_dict.append({
                 "name": tool.name,
                 "description": tool.description,
@@ -195,20 +237,31 @@ def handle_list_tools(request_id: Any, params: Dict[str, Any]):
     except Exception as e:
         return send_error(-32603, "Error listing tools", request_id, str(e))
 
-def handle_call_tool(request_id: Any, params: Dict[str, Any]):
+def handle_call_tool(request_id: Any, params: Dict[str, Any], request_headers: Optional[Dict[str, str]] = None):
     """Handle the tools/call method"""
     if not sfmcpimpl:
         return send_error(-32603, "Server not properly initialized", request_id)
         
     try:
         name = params.get('name')
-        arguments = params.get('arguments', {})
+        arguments = params.get('arguments', {}).copy()  # Copy to avoid modifying original
         
         if not name:
             return send_error(-32602, "Invalid params", request_id)
         
-        # Get a fresh Salesforce client for this request
-        client = get_sf_client()
+        # Extract credentials from arguments or params if provided
+        credentials = arguments.pop('_sf_credentials', None) or params.get('credentials')
+        encrypted_credentials = arguments.pop('_sf_encrypted_credentials', None) or params.get('encrypted_credentials')
+        
+        # Get a fresh Salesforce client for this request with appropriate credentials
+        client = get_sf_client(
+            credentials=credentials,
+            encrypted_credentials=encrypted_credentials,
+            request_headers=request_headers
+        )
+        
+        if not client:
+            return send_error(-32603, "Unable to establish Salesforce connection. Please check credentials.", request_id)
         
         # Call the appropriate tool implementation
         if name == "create_object":
@@ -257,6 +310,8 @@ def handle_call_tool(request_id: Any, params: Dict[str, Any]):
             result = sfmcpimpl.get_picklist_values_impl(client, arguments)
         elif name == "get_validation_rules":
             result = sfmcpimpl.get_validation_rules_impl(client, arguments)
+        elif name == "create_einstein_model":
+            result = sfmcpimpl.create_einstein_model_impl(client, arguments)
         else:
             return send_error(-32601, f"Unknown tool: {name}", request_id)
         
@@ -275,9 +330,13 @@ def handle_call_tool(request_id: Any, params: Dict[str, Any]):
         return send_json_rpc_response(request_id, response_result)
         
     except ValueError as e:
-        return send_error(-32602, "Invalid params", request_id, str(e))
+        print(f"❌ ValueError in handle_call_tool: {str(e)}")
+        return send_error(-32602, f"Invalid params: {str(e)}", request_id, str(e))
     except Exception as e:
-        return send_error(-32603, "Internal server error", request_id, str(e))
+        print(f"❌ Exception in handle_call_tool: {str(e)}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return send_error(-32603, f"Internal server error: {str(e)}", request_id, str(e))
 
 class handler(BaseHTTPRequestHandler):
     """Vercel serverless function handler compatible with Python runtime"""
@@ -314,15 +373,18 @@ class handler(BaseHTTPRequestHandler):
                 self._send_vercel_response(response)
                 return
             
+            # Extract headers for credential handling
+            headers_dict = {key: value for key, value in self.headers.items()}
+            
             # Handle different methods
             if method == 'initialize':
                 response = handle_initialize(request_id, params)
             elif method == 'tools/list':
-                response = handle_list_tools(request_id, params)
+                response = handle_list_tools(request_id, params, headers_dict)
             elif method == 'tools/call':
-                response = handle_call_tool(request_id, params)
+                response = handle_call_tool(request_id, params, headers_dict)
             elif method == 'health/check':
-                response = handle_health_check(request_id, params)
+                response = handle_health_check(request_id, params, headers_dict)
             else:
                 response = send_error(-32601, "Method not found", request_id)
             
@@ -338,7 +400,8 @@ class handler(BaseHTTPRequestHandler):
         try:
             if self.path == '/health' or self.path == '/':
                 # Simple health check via GET
-                health_result = handle_health_check("health-check", {})
+                headers_dict = {key: value for key, value in self.headers.items()}
+                health_result = handle_health_check("health-check", {}, headers_dict)
                 response = {
                     'statusCode': 200,
                     'headers': {

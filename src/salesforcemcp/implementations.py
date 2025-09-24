@@ -27,7 +27,7 @@ def create_object_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, A
         raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
     metadata_service.write_to_file(json.dumps(json_obj))
     metadata_service.create_metadata_package(json_obj)
-    metadata_service.create_send_to_server(sf_client.connection)
+    metadata_service.deploy_object_package(sf_client.connection)
 
     return [
         types.TextContent(
@@ -54,7 +54,7 @@ def create_object_with_fields_impl(sf_client: sfdc_client.OrgHandler, arguments:
         raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
     metadata_service.write_to_file(json.dumps(json_obj))
     metadata_service.create_metadata_package(json_obj)
-    metadata_service.create_send_to_server(sf_client.connection)
+    metadata_service.deploy_object_package(sf_client.connection)
 
     return [
         types.TextContent(
@@ -73,8 +73,8 @@ def delete_object_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict
 
     if not sf_client.connection:
         raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
-    sfdc_client.delete_fields(json_obj)
-    sfdc_client.delete_send_to_server(sf_client.connection)
+    metadata_service.delete_fields(json_obj)
+    metadata_service.delete_send_to_server(sf_client.connection)
 
     return [
         types.TextContent(
@@ -127,8 +127,8 @@ def create_tab_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]
         raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
 
     try:
-        sfdc_client.create_tab_package(json_obj)
-        sfdc_client.create_send_to_server(sf_client.connection)
+        metadata_service.create_tab_package(json_obj)
+        metadata_service.deploy_tab_package(sf_client.connection)
         return [
             types.TextContent(
                 type="text",
@@ -169,8 +169,8 @@ def create_custom_app_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[st
             raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
 
         try:
-            sfdc_client.create_custom_app_package(json_obj)
-            sfdc_client.create_send_to_server(sf_client.connection)
+            metadata_service.create_custom_app_package(json_obj)
+            metadata_service.create_send_to_server(sf_client.connection)
             return [
                 types.TextContent(
                     type="text",
@@ -222,7 +222,7 @@ def run_sosl_search_impl(sf_client: OrgHandler, arguments: dict[str, str]):
     except Exception as e:
         return [types.TextContent(type="text", text=f"Error executing SOSL: {e}")]
 
-def get_object_fields_impl(sf_client: OrgHandler, arguments: dict[str, str]):
+def get_object_fields_impl(sf_client: OrgHandler, arguments: dict[str, Any]):
     object_name = arguments.get("object_name")
     if not object_name:
         raise ValueError("Missing 'object_name' argument")
@@ -332,7 +332,7 @@ def create_custom_fields_impl(sf_client: OrgHandler, arguments: dict[str, Any]):
         raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
     metadata_service.write_to_file(json.dumps(json_obj))
     metadata_service.create_metadata_package(json_obj)
-    metadata_service.create_send_to_server(sf_client.connection)
+    metadata_service.deploy_object_package(sf_client.connection)
 
     return [
         types.TextContent(
@@ -762,3 +762,62 @@ def get_validation_rules_impl(sf_client: OrgHandler, arguments: dict[str, Any]):
         return [types.TextContent(type="text", text=output)]
     except Exception as e:
         return [types.TextContent(type="text", text=f"Error retrieving validation rules: {str(e)}")]
+
+# --- Einstein Studio Model Implementations ---
+
+def create_einstein_model_impl(sf_client: OrgHandler, arguments: dict[str, Any]):
+    """Creates an Einstein Studio model using AppFrameworkTemplateBundle."""
+    model_name = arguments.get("model_name")
+    description = arguments.get("description")
+    model_capability = arguments.get("model_capability", "BinaryClassification")
+    outcome_field = arguments.get("outcome_field")
+    goal = arguments.get("goal", "Maximize")
+    data_source = arguments.get("data_source")
+    success_value = arguments.get("success_value", "true")
+    failure_value = arguments.get("failure_value", "false")
+    algorithm_type = arguments.get("algorithm_type", "XGBoost")
+    fields = arguments.get("fields", [])
+
+    # Validate required fields
+    if not all([model_name, description, outcome_field, data_source, fields]):
+        return [types.TextContent(
+            type="text", 
+            text="Missing required fields: model_name, description, outcome_field, data_source, and fields are required"
+        )]
+
+    if not sf_client.connection:
+        return [types.TextContent(
+            type="text", 
+            text="Salesforce connection is not active. Cannot perform metadata deployment."
+        )]
+
+    try:
+        # Create Einstein Studio model package
+        json_obj = {
+            "model_name": model_name,
+            "description": description,
+            "model_capability": model_capability,
+            "outcome_field": outcome_field,
+            "goal": goal,
+            "data_source": data_source,
+            "success_value": success_value,
+            "failure_value": failure_value,
+            "algorithm_type": algorithm_type,
+            "fields": fields
+        }
+
+        sfdc_client.write_to_file(json.dumps(json_obj))
+        sfdc_client.create_einstein_model_package(json_obj)
+        sfdc_client.deploy_package_from_deploy_dir(sf_client.connection)
+
+        return [
+            types.TextContent(
+                type="text",
+                text=f"Einstein Studio model '{model_name}' creation package prepared and deployment initiated."
+            )
+        ]
+    except Exception as e:
+        return [types.TextContent(
+            type="text", 
+            text=f"Error creating Einstein Studio model: {str(e)}"
+        )]

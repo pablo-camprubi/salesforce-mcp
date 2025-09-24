@@ -2,10 +2,85 @@ import shutil
 import os
 import base64
 from simple_salesforce import Salesforce
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 import xml.etree.ElementTree as ET
+import json
+from cryptography.fernet import Fernet
+import hashlib
+import zipfile
 
 BASE_PATH=os.getenv("BASE_PATH", "/tmp")
+DEPLOY_DIR = "deployment_package"
+
+def decrypt_credentials(encrypted_credentials: str, encryption_key: str = None) -> Dict[str, str]:
+    """
+    Decrypt encrypted credentials passed from the platform.
+    
+    Args:
+        encrypted_credentials: Base64 encoded encrypted credentials JSON
+        encryption_key: Optional encryption key. If not provided, will try environment variable.
+        
+    Returns:
+        dict: Decrypted credentials containing username, password, security_token
+    """
+    try:
+        # Get encryption key from parameter or environment
+        key = encryption_key or os.getenv("ENCRYPTION_KEY")
+        if not key:
+            raise ValueError("Encryption key not provided")
+            
+        # Create Fernet instance
+        fernet = Fernet(key.encode() if isinstance(key, str) else key)
+        
+        # Decode base64 and decrypt
+        encrypted_data = base64.b64decode(encrypted_credentials.encode())
+        decrypted_data = fernet.decrypt(encrypted_data)
+        
+        # Parse JSON
+        credentials = json.loads(decrypted_data.decode())
+        
+        # Validate required fields
+        required_fields = ['username', 'password']
+        for field in required_fields:
+            if field not in credentials:
+                raise ValueError(f"Missing required credential field: {field}")
+                
+        return credentials
+        
+    except Exception as e:
+        print(f"Failed to decrypt credentials: {str(e)}")
+        raise ValueError(f"Credential decryption failed: {str(e)}")
+
+def encrypt_credentials(credentials: Dict[str, str], encryption_key: str = None) -> str:
+    """
+    Encrypt credentials for secure transmission (utility function for testing).
+    
+    Args:
+        credentials: Dict containing username, password, security_token
+        encryption_key: Optional encryption key. If not provided, will try environment variable.
+        
+    Returns:
+        str: Base64 encoded encrypted credentials
+    """
+    try:
+        # Get encryption key from parameter or environment
+        key = encryption_key or os.getenv("ENCRYPTION_KEY")
+        if not key:
+            raise ValueError("Encryption key not provided")
+            
+        # Create Fernet instance
+        fernet = Fernet(key.encode() if isinstance(key, str) else key)
+        
+        # Convert to JSON and encrypt
+        json_data = json.dumps(credentials).encode()
+        encrypted_data = fernet.encrypt(json_data)
+        
+        # Encode as base64
+        return base64.b64encode(encrypted_data).decode()
+        
+    except Exception as e:
+        print(f"Failed to encrypt credentials: {str(e)}")
+        raise ValueError(f"Credential encryption failed: {str(e)}")
 
 class OrgHandler:
     """Manages interactions and caching for a Salesforce org."""
@@ -14,23 +89,95 @@ class OrgHandler:
         self.connection: Optional[Salesforce] = None
         self.metadata_cache: dict[str, Any] = {}
 
-    def establish_connection(self) -> bool:
+    def establish_connection(self, username: str = None, password: str = None, security_token: str = None) -> bool:
         """Initiates and authenticates the connection to the Salesforce org.
+        
+        Args:
+            username: Salesforce username. If not provided, will try environment variable.
+            password: Salesforce password. If not provided, will try environment variable.
+            security_token: Salesforce security token. If not provided, will try environment variable.
 
         Returns:
             bool: Returns True upon successful authentication, False otherwise.
         """
         try:
+            # Use provided credentials or fall back to environment variables
+            final_username = username or os.getenv("USERNAME")
+            final_password = password or os.getenv("PASSWORD")
+            final_security_token = security_token or os.getenv("SECURITY_TOKEN", "")
+            
+            if not final_username or not final_password:
+                print("Missing required Salesforce credentials (username/password)")
+                return False
+                
             self.connection = Salesforce(
-                username=os.getenv("USERNAME"),
-                password=os.getenv("PASSWORD"),
-                security_token=os.getenv("SECURITY_TOKEN")
+                username=final_username,
+                password=final_password,
+                security_token=final_security_token
             )
             return True
         except Exception as e:
             print(f"Failed to establish Salesforce connection: {str(e)}")
             self.connection = None
             return False
+    
+    def establish_connection_with_encrypted_credentials(self, encrypted_credentials: str, encryption_key: str = None) -> bool:
+        """Initiates and authenticates the connection using encrypted credentials.
+        
+        Args:
+            encrypted_credentials: Base64 encoded encrypted credentials JSON
+            encryption_key: Optional encryption key. If not provided, will try environment variable.
+
+        Returns:
+            bool: Returns True upon successful authentication, False otherwise.
+        """
+        try:
+            # Decrypt credentials
+            credentials = decrypt_credentials(encrypted_credentials, encryption_key)
+            
+            # Establish connection using decrypted credentials
+            return self.establish_connection(
+                username=credentials.get('username'),
+                password=credentials.get('password'),
+                security_token=credentials.get('security_token', '')
+            )
+        except Exception as e:
+            print(f"Failed to establish connection with encrypted credentials: {str(e)}")
+            self.connection = None
+            return False
+    
+    def get_object_fields_cached(self, object_name: str) -> dict:
+        """Gets object field metadata with caching support.
+        
+        Args:
+            object_name: The API name of the Salesforce object (e.g., 'Account', 'CustomObject__c')
+            
+        Returns:
+            dict: Object description including field metadata
+        """
+        if not self.connection:
+            raise ValueError("Salesforce connection is not established")
+        
+        # Check cache first
+        cache_key = f"object_fields_{object_name}"
+        if cache_key in self.metadata_cache:
+            print(f"📋 Using cached fields for {object_name}")
+            return self.metadata_cache[cache_key]
+        
+        try:
+            # Use simple-salesforce describe method
+            object_description = getattr(self.connection, object_name).describe()
+            
+            # Cache the result
+            self.metadata_cache[cache_key] = object_description
+            print(f"✅ Retrieved and cached {len(object_description.get('fields', []))} fields for {object_name}")
+            
+            return object_description
+            
+        except AttributeError:
+            raise ValueError(f"Object '{object_name}' not found or not accessible")
+        except Exception as e:
+            raise ValueError(f"Failed to retrieve fields for '{object_name}': {str(e)}")
 
 def write_to_file(content):
     with open(f"{BASE_PATH}/mylog.txt", 'a') as f:
@@ -485,4 +632,224 @@ def create_metadata_package(json_obj):
 
     with open(obj_path, "w", encoding="utf-8") as file:
         file.write(obj_tmpl)
+
+def _clean_deploy_dir():
+    """Removes and recreates the deployment directory."""
+    deploy_path = os.path.join(BASE_PATH, DEPLOY_DIR)
+    if os.path.exists(deploy_path):
+        shutil.rmtree(deploy_path)
+    os.makedirs(deploy_path, exist_ok=True)
+
+def create_einstein_model_package(json_obj):
+    """Creates an Einstein Studio model package using AppFrameworkTemplateBundle."""
+    try:
+        # Clean and prepare deploy directory
+        _clean_deploy_dir()
+        
+        model_name = json_obj["model_name"]
+        description = json_obj["description"]
+        model_capability = json_obj["model_capability"]
+        outcome_field = json_obj["outcome_field"]
+        goal = json_obj["goal"]
+        data_source = json_obj["data_source"]
+        success_value = json_obj["success_value"]
+        failure_value = json_obj["failure_value"]
+        algorithm_type = json_obj["algorithm_type"]
+        fields = json_obj["fields"]
+        
+        # Create template name (sanitized)
+        template_name = model_name.replace(" ", "_").replace("-", "_")
+        
+        # Copy Einstein model template structure
+        source_template = os.path.join(BASE_PATH, "assets", "create_einstein_model_tmpl", "appTemplates", "##template_name##")
+        deploy_dir = os.path.join(BASE_PATH, DEPLOY_DIR)
+        target_template_dir = os.path.join(deploy_dir, "appTemplates", template_name)
+        
+        # Create directory structure
+        os.makedirs(target_template_dir, exist_ok=True)
+        
+        # Copy and process template files
+        shutil.copytree(source_template, target_template_dir, dirs_exist_ok=True)
+        
+        # Process ModelContainer.json
+        container_path = os.path.join(target_template_dir, "ml", "containers", "ModelContainer.json")
+        with open(container_path, "r", encoding="utf-8") as f:
+            container_content = f.read()
+        
+        container_content = container_content.replace("##model_label##", model_name)
+        container_content = container_content.replace("##model_description##", description)
+        container_content = container_content.replace("##model_capability##", model_capability)
+        container_content = container_content.replace("##outcome_field##", outcome_field)
+        container_content = container_content.replace("##goal##", goal)
+        
+        with open(container_path, "w", encoding="utf-8") as f:
+            f.write(container_content)
+        
+        # Process ModelSetup.json with fields
+        setup_path = os.path.join(target_template_dir, "ml", "setups", "ModelSetup.json")
+        with open(setup_path, "r", encoding="utf-8") as f:
+            setup_content = f.read()
+        
+        # Build fields JSON
+        fields_json = build_einstein_fields_json(fields, outcome_field)
+        
+        # Determine outcome type based on model capability
+        outcome_type = "Binary" if model_capability == "BinaryClassification" else "Regression"
+        
+        setup_content = setup_content.replace("##setup_description##", f"{description} - Model Setup")
+        setup_content = setup_content.replace("##data_source##", data_source)
+        setup_content = setup_content.replace("##outcome_type##", outcome_type)
+        setup_content = setup_content.replace("##failure_value##", failure_value)
+        setup_content = setup_content.replace("##goal##", goal)
+        setup_content = setup_content.replace("##outcome_label##", outcome_field.replace("_", " ").replace("__c", ""))
+        setup_content = setup_content.replace("##outcome_field##", outcome_field)
+        setup_content = setup_content.replace("##success_value##", success_value)
+        setup_content = setup_content.replace("##algorithm_type##", algorithm_type)
+        setup_content = setup_content.replace("##fields_json##", fields_json)
+        
+        with open(setup_path, "w", encoding="utf-8") as f:
+            f.write(setup_content)
+        
+        # Process template-info.json
+        template_info_path = os.path.join(target_template_dir, "template-info.json")
+        with open(template_info_path, "r", encoding="utf-8") as f:
+            template_info_content = f.read()
+        
+        template_info_content = template_info_content.replace("##model_label##", model_name)
+        template_info_content = template_info_content.replace("##template_description##", f"{description} - Einstein Studio Model Template")
+        template_info_content = template_info_content.replace("##template_name##", template_name)
+        
+        with open(template_info_path, "w", encoding="utf-8") as f:
+            f.write(template_info_content)
+        
+        # Create package.xml for AppFrameworkTemplateBundle
+        source_package = os.path.join(BASE_PATH, "assets", "create_einstein_model_tmpl", "package.xml")
+        target_package = os.path.join(deploy_dir, "package.xml")
+        
+        with open(source_package, "r", encoding="utf-8") as f:
+            package_content = f.read()
+        
+        package_content = package_content.replace("##template_name##", template_name)
+        
+        with open(target_package, "w", encoding="utf-8") as f:
+            f.write(package_content)
+        
+        write_to_file(f"Einstein Studio model package created: {template_name}")
+        
+    except Exception as e:
+        err_msg = f"Error creating Einstein model package: {e}"
+        with open(f"{BASE_PATH}/check.txt", 'a') as f:
+            f.write(err_msg)
+        raise Exception(err_msg)
+
+def build_einstein_fields_json(fields, outcome_field):
+    """Builds the fields JSON array for Einstein Studio ModelSetup."""
+    try:
+        fields_array = []
+        
+        # Add outcome field first (always Text/Categorical for classification)
+        outcome_field_obj = {
+            "type": "Text",
+            "balanced": False,
+            "dataType": "Categorical",
+            "highCardinality": False,
+            "ignored": False,
+            "includeOther": True,
+            "label": outcome_field.replace("_", " ").replace("__c", ""),
+            "name": outcome_field,
+            "ordering": "Occurrence",
+            "sensitive": False,
+            "source": None,
+            "values": []
+        }
+        fields_array.append(outcome_field_obj)
+        
+        # Add other fields with correct structure per field type
+        for field in fields:
+            field_name = field["field_name"]
+            field_label = field["field_label"] 
+            field_type = field["field_type"]
+            data_type = field["data_type"]
+            ignored = field.get("ignored", False)
+            
+            if field_type == "Text":
+                # Text fields structure
+                field_obj = {
+                    "type": "Text",
+                    "balanced": False,
+                    "dataType": data_type,
+                    "highCardinality": False,
+                    "ignored": ignored,
+                    "includeOther": True,
+                    "label": field_label,
+                    "name": field_name,
+                    "ordering": "Occurrence",
+                    "sensitive": False,
+                    "source": None,
+                    "values": []
+                }
+            elif field_type == "Number":
+                # Number fields structure (different properties)
+                field_obj = {
+                    "type": "Number",
+                    "bucketingStrategy": {
+                        "type": "Percentile",
+                        "numberOfBuckets": 10
+                    },
+                    "highCardinality": None,
+                    "ignored": ignored,
+                    "label": field_label,
+                    "name": field_name,
+                    "sensitive": False,
+                    "source": None,
+                    "max": 10000000000,
+                    "min": 0
+                }
+            else:
+                # Fallback to Text structure for unknown types
+                field_obj = {
+                    "type": "Text",
+                    "balanced": False,
+                    "dataType": "Categorical",
+                    "highCardinality": False,
+                    "ignored": ignored,
+                    "includeOther": True,
+                    "label": field_label,
+                    "name": field_name,
+                    "ordering": "Occurrence",
+                    "sensitive": False,
+                    "source": None,
+                    "values": []
+                }
+            
+            fields_array.append(field_obj)
+        
+        return json.dumps(fields_array, indent=4)
+        
+    except Exception as e:
+        raise Exception(f"Error building fields JSON: {e}")
+
+def deploy_package_from_deploy_dir(sf):
+    """Zips the DEPLOY_DIR and deploys it via the Metadata API."""
+    deploy_dir_path = os.path.join(BASE_PATH, DEPLOY_DIR)
+    if not os.path.exists(deploy_dir_path):
+        raise FileNotFoundError(f"Deployment directory not found: {deploy_dir_path}")
+
+    # Zip only the contents of the deployment directory (no parent folder)
+    zip_path = os.path.join(BASE_PATH, "deploy_package.zip")
+    # Remove old zip if present
+    if os.path.exists(zip_path):
+        os.remove(zip_path)
+    # Create new zip with contents at the root
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(deploy_dir_path):
+            for file in files:
+                abs_file = os.path.join(root, file)
+                # Compute path relative to deploy_dir_path
+                rel_path = os.path.relpath(abs_file, deploy_dir_path)
+                zf.write(abs_file, rel_path)
+
+    # Encode and deploy
+    b64 = binary_to_base64(zip_path)
+    deploy(b64, sf)
 

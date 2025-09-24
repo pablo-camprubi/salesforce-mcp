@@ -15,3 +15,6 @@ python-dotenv>=1.0.0
 
 # Typing extensions for better type hints
 typing-extensions>=4.7.0
+
+# Cryptography for credential encryption/decryption
+cryptography>=3.4.8
