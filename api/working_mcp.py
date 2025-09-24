@@ -209,8 +209,37 @@ class handler(BaseHTTPRequestHandler):
         self._set_response()
 
     def do_GET(self):
-        """Handle GET requests - health check"""
+        """Handle GET requests - health check and SSE connection"""
         try:
+            # Check if client is requesting SSE connection
+            accept_header = self.headers.get('Accept', '')
+            if 'text/event-stream' in accept_header or self.path == '/sse':
+                # Set up SSE connection
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache')
+                self.send_header('Connection', 'keep-alive')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+                self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Salesforce-Credentials, X-Salesforce-Encrypted-Credentials')
+                self.end_headers()
+                
+                # Send initial SSE message
+                headers_dict = dict(self.headers.items())
+                result = handle_health_check("health_check", {}, headers_dict)
+                
+                # Format as SSE
+                sse_data = json.dumps({
+                    "jsonrpc": "2.0",
+                    "id": "health-check",
+                    "result": result
+                })
+                
+                self.wfile.write(f"data: {sse_data}\n\n".encode('utf-8'))
+                self.wfile.flush()
+                return
+            
+            # Regular health check
             headers_dict = dict(self.headers.items())
             result = handle_health_check("health_check", {}, headers_dict)
             
@@ -244,6 +273,10 @@ class handler(BaseHTTPRequestHandler):
             # Extract headers
             headers_dict = dict(self.headers.items())
             
+            # Check if client expects SSE response
+            accept_header = self.headers.get('Accept', '')
+            is_sse_request = 'text/event-stream' in accept_header
+            
             # Handle MCP method calls
             method = request_data.get("method", "")
             request_id = request_data.get("id", "unknown")
@@ -275,7 +308,22 @@ class handler(BaseHTTPRequestHandler):
                     }
                 }
             
-            self._set_response(json.dumps(response))
+            # Send response in appropriate format
+            if is_sse_request:
+                # Send as SSE
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache')
+                self.send_header('Connection', 'keep-alive')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                sse_data = json.dumps(response)
+                self.wfile.write(f"data: {sse_data}\n\n".encode('utf-8'))
+                self.wfile.flush()
+            else:
+                # Send as regular JSON
+                self._set_response(json.dumps(response))
             
         except Exception as e:
             error_response = {
@@ -286,4 +334,20 @@ class handler(BaseHTTPRequestHandler):
                     "message": f"Internal error: {str(e)}"
                 }
             }
-            self._set_response(json.dumps(error_response), status=500)
+            
+            # Check if SSE response is expected for error too
+            accept_header = self.headers.get('Accept', '')
+            is_sse_request = 'text/event-stream' in accept_header
+            
+            if is_sse_request:
+                self.send_response(200)  # Still send 200 for SSE, error is in data
+                self.send_header('Content-Type', 'text/event-stream')
+                self.send_header('Cache-Control', 'no-cache')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                
+                sse_data = json.dumps(error_response)
+                self.wfile.write(f"data: {sse_data}\n\n".encode('utf-8'))
+                self.wfile.flush()
+            else:
+                self._set_response(json.dumps(error_response), status=500)
