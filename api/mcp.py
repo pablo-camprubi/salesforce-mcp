@@ -11,14 +11,23 @@ try:
     import salesforcemcp.sfdc_client as sfdc_client
     import salesforcemcp.definitions as sfmcpdef
     import salesforcemcp.implementations as sfmcpimpl
-    import mcp.types as types
+    # Use minimal types instead of full MCP library for serverless compatibility
+    from . import types_minimal as types
 except ImportError as e:
     print(f"Import error: {e}")
     # For development/testing when modules might not be available
     sfdc_client = None
     sfmcpdef = None
     sfmcpimpl = None
-    types = None
+    
+    # Create minimal types fallback
+    class TextContent:
+        def __init__(self, type: str, text: str):
+            self.type = type
+            self.text = text
+    
+    class types:
+        TextContent = TextContent
 
 def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_credentials: Optional[str] = None, request_headers: Optional[Dict[str, str]] = None) -> Optional[sfdc_client.OrgHandler]:
     """Get a fresh Salesforce client connection with provided or inferred credentials.

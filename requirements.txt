@@ -1,6 +1,3 @@
-# MCP Server dependencies
-mcp>=1.0.0
-
 # Salesforce API client
 simple-salesforce>=1.12.0
 
