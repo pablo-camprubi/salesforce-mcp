@@ -1,4 +1,18 @@
-import mcp.types as types
+# Use local types instead of mcp library for serverless compatibility
+class TextContent:
+    def __init__(self, type: str, text: str):
+        self.type = type
+        self.text = text
+
+class Tool:
+    def __init__(self, name: str, description: str, inputSchema: dict):
+        self.name = name
+        self.description = description
+        self.inputSchema = inputSchema
+
+class types:
+    Tool = Tool
+    TextContent = TextContent
 
 def get_tools():
     tools = [
