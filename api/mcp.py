@@ -4,22 +4,28 @@ import os
 from typing import Any, Dict, List, Optional
 from http.server import BaseHTTPRequestHandler
 
-# Add the src directory to the Python path for local imports
-current_dir = os.path.dirname(__file__)
-src_path = os.path.join(current_dir, '..', 'src')
-sys.path.insert(0, src_path)
-
-# Import handling with fallbacks for serverless environment
+# Import handling with local modules for serverless environment
 try:
-    import salesforcemcp.sfdc_client as sfdc_client
-    import salesforcemcp.definitions as sfmcpdef
-    import salesforcemcp.implementations as sfmcpimpl
-    print("Successfully imported Salesforce MCP modules")
-except ImportError as e:
-    print(f"Import error for MCP modules: {e}")
-    sfdc_client = None
-    sfmcpdef = None
-    sfmcpimpl = None
+    # Try local import first (for serverless)
+    from . import salesforcemcp.sfdc_client as sfdc_client
+    from . import salesforcemcp.definitions as sfmcpdef
+    from . import salesforcemcp.implementations as sfmcpimpl
+    print("Successfully imported Salesforce MCP modules (local)")
+except ImportError:
+    try:
+        # Fallback to src path import (for local dev)
+        current_dir = os.path.dirname(__file__)
+        src_path = os.path.join(current_dir, '..', 'src')
+        sys.path.insert(0, src_path)
+        import salesforcemcp.sfdc_client as sfdc_client
+        import salesforcemcp.definitions as sfmcpdef
+        import salesforcemcp.implementations as sfmcpimpl
+        print("Successfully imported Salesforce MCP modules (src)")
+    except ImportError as e:
+        print(f"Import error for MCP modules: {e}")
+        sfdc_client = None
+        sfmcpdef = None
+        sfmcpimpl = None
 
 # Minimal types for MCP compatibility
 class TextContent:
