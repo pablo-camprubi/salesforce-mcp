@@ -211,6 +211,16 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests - health check and SSE connection"""
         try:
+            # Handle save-credentials endpoint
+            if self.path == '/save-credentials':
+                # This endpoint is used by clients to test credential saving
+                response = {
+                    "status": "success",
+                    "message": "Credentials endpoint ready for POST requests"
+                }
+                self._set_response(json.dumps(response, indent=2))
+                return
+            
             # Check if client is requesting SSE connection
             accept_header = self.headers.get('Accept', '')
             if 'text/event-stream' in accept_header or self.path == '/sse':
@@ -260,9 +270,55 @@ class handler(BaseHTTPRequestHandler):
             self._set_response(json.dumps(error_response, indent=2), status=500)
 
     def do_POST(self):
-        """Handle POST requests - MCP JSON-RPC"""
+        """Handle POST requests - MCP JSON-RPC and credential saving"""
         try:
-            # Read request body
+            # Handle save-credentials endpoint
+            if self.path == '/save-credentials':
+                content_length = int(self.headers.get('Content-Length', 0))
+                if content_length > 0:
+                    post_data = self.rfile.read(content_length)
+                    try:
+                        credential_data = json.loads(post_data.decode('utf-8'))
+                        
+                        # Test the provided credentials by creating a client
+                        client = get_sf_client(
+                            credentials=credential_data.get('credentials'),
+                            encrypted_credentials=credential_data.get('encrypted_credentials')
+                        )
+                        
+                        if client:
+                            response = {
+                                "status": "success",
+                                "message": "Credentials validated successfully",
+                                "connection_test": "passed"
+                            }
+                        else:
+                            response = {
+                                "status": "error", 
+                                "message": "Invalid credentials - could not establish Salesforce connection",
+                                "connection_test": "failed"
+                            }
+                        
+                        self._set_response(json.dumps(response, indent=2))
+                        return
+                        
+                    except json.JSONDecodeError:
+                        error_response = {
+                            "status": "error",
+                            "message": "Invalid JSON in request body"
+                        }
+                        self._set_response(json.dumps(error_response), status=400)
+                        return
+                else:
+                    # No body provided
+                    response = {
+                        "status": "error",
+                        "message": "No credentials provided in request body"
+                    }
+                    self._set_response(json.dumps(response), status=400)
+                    return
+            
+            # Read request body for MCP JSON-RPC
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length == 0:
                 raise ValueError("Empty request body")
