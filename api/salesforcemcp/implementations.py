@@ -1,7 +1,15 @@
-import salesforcemcp.sfdc_client as sfdc_client
-from salesforcemcp.sfdc_client import OrgHandler
-import salesforcemcp.metadata_service as metadata_service
-import mcp.types as types
+from . import sfdc_client
+from .sfdc_client import OrgHandler
+from . import metadata_service
+
+# Use local types instead of mcp library for serverless compatibility
+class TextContent:
+    def __init__(self, type: str, text: str):
+        self.type = type
+        self.text = text
+
+class types:
+    TextContent = TextContent
 import json
 from simple_salesforce import SalesforceError
 from typing import Any, Optional
