@@ -2,11 +2,11 @@
   "rewrites": [
     {
       "source": "/api/mcp",
-      "destination": "/api/minimal_mcp"
+      "destination": "/api/mcp"
     },
     {
       "source": "/(.*)",
-      "destination": "/api/minimal_mcp"
+      "destination": "/api/mcp"
     }
   ]
 }

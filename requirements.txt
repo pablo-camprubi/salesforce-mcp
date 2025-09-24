@@ -1,17 +1,4 @@
-# Salesforce API client
+# Minimal dependencies for serverless compatibility
 simple-salesforce>=1.12.0
-
-# XML processing for Salesforce metadata
-lxml>=4.9.0
-
-# HTTP requests
 requests>=2.31.0
-
-# Environment variable support
-python-dotenv>=1.0.0
-
-# Typing extensions for better type hints
-typing-extensions>=4.7.0
-
-# Cryptography for credential encryption/decryption
 cryptography>=3.4.8
