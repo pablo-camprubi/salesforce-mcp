@@ -5,6 +5,10 @@
       "destination": "/api/working_mcp"
     },
     {
+      "source": "/api/salesforce/save-credentials",
+      "destination": "/api/working_mcp"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/working_mcp"
     }
