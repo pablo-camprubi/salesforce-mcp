@@ -9,7 +9,8 @@ from cryptography.fernet import Fernet
 import hashlib
 import zipfile
 
-BASE_PATH=os.getenv("BASE_PATH", "/tmp")
+# In serverless environment, assets are in the current directory structure
+BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Go up to api/ directory
 DEPLOY_DIR = "deployment_package"
 
 def decrypt_credentials(encrypted_credentials: str, encryption_key: str = None) -> Dict[str, str]:
