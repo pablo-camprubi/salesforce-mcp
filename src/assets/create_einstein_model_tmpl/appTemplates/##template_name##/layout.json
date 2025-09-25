@@ -1,0 +1,23 @@
+{
+  "layout": {
+    "type": "Einstein",
+    "sections": [
+      {
+        "type": "ModelConfiguration",
+        "title": "Model Configuration",
+        "fields": [
+          "outcomeField",
+          "goal",
+          "algorithmType"
+        ]
+      },
+      {
+        "type": "DataSource",
+        "title": "Data Source",
+        "fields": [
+          "dataSource"
+        ]
+      }
+    ]
+  }
+}
