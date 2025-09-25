@@ -24,12 +24,31 @@ def decrypt_credentials(encrypted_credentials: str, encryption_key: str = None) 
         dict: Decrypted credentials containing username, password, security_token
     """
     try:
+        print(f"🔍 DECRYPT DEBUG: Raw encrypted length: {len(encrypted_credentials)}")
+        print(f"🔍 DECRYPT DEBUG: Raw encrypted (first 50): {encrypted_credentials[:50]}...")
+        
         # Get encryption key from parameter or environment
         key = encryption_key or os.getenv("ENCRYPTION_KEY")
         if not key:
-            raise ValueError("Encryption key not provided")
+            print("❌ DECRYPT DEBUG: No encryption key found")
+            # Try direct base64 decode (for testing)
+            try:
+                print("🔄 DECRYPT DEBUG: Trying direct base64 decode...")
+                decoded_data = base64.b64decode(encrypted_credentials.encode())
+                credentials = json.loads(decoded_data.decode())
+                print(f"✅ DECRYPT DEBUG: Direct base64 decode successful")
+                print(f"🔍 DECRYPT DEBUG: Username: {credentials.get('username')}")
+                print(f"🔍 DECRYPT DEBUG: Password length: {len(credentials.get('password', ''))}")
+                print(f"🔍 DECRYPT DEBUG: Security token length: {len(credentials.get('security_token', ''))}")
+                print(f"🔍 DECRYPT DEBUG: Security token (securityToken): {len(credentials.get('securityToken', ''))}")
+                print(f"🔍 DECRYPT DEBUG: Instance URL: {credentials.get('instanceUrl', credentials.get('instance_url', 'not found'))}")
+                return credentials
+            except Exception as direct_e:
+                print(f"❌ DECRYPT DEBUG: Direct base64 decode failed: {direct_e}")
+                raise ValueError("Encryption key not provided and direct decode failed")
             
         # Create Fernet instance
+        print("🔄 DECRYPT DEBUG: Using encryption key for Fernet decryption")
         fernet = Fernet(key.encode() if isinstance(key, str) else key)
         
         # Decode base64 and decrypt
@@ -38,6 +57,12 @@ def decrypt_credentials(encrypted_credentials: str, encryption_key: str = None) 
         
         # Parse JSON
         credentials = json.loads(decrypted_data.decode())
+        print(f"✅ DECRYPT DEBUG: Fernet decryption successful")
+        print(f"🔍 DECRYPT DEBUG: Username: {credentials.get('username')}")
+        print(f"🔍 DECRYPT DEBUG: Password length: {len(credentials.get('password', ''))}")
+        print(f"🔍 DECRYPT DEBUG: Security token length: {len(credentials.get('security_token', ''))}")
+        print(f"🔍 DECRYPT DEBUG: Security token (securityToken): {len(credentials.get('securityToken', ''))}")
+        print(f"🔍 DECRYPT DEBUG: Instance URL: {credentials.get('instanceUrl', credentials.get('instance_url', 'not found'))}")
         
         # Validate required fields
         required_fields = ['username', 'password']
@@ -48,7 +73,8 @@ def decrypt_credentials(encrypted_credentials: str, encryption_key: str = None) 
         return credentials
         
     except Exception as e:
-        print(f"Failed to decrypt credentials: {str(e)}")
+        print(f"❌ DECRYPT ERROR: {str(e)}")
+        print(f"❌ DECRYPT ERROR TYPE: {type(e).__name__}")
         raise ValueError(f"Credential decryption failed: {str(e)}")
 
 def encrypt_credentials(credentials: Dict[str, str], encryption_key: str = None) -> str:
@@ -89,13 +115,14 @@ class OrgHandler:
         self.connection: Optional[Salesforce] = None
         self.metadata_cache: dict[str, Any] = {}
 
-    def establish_connection(self, username: str = None, password: str = None, security_token: str = None) -> bool:
+    def establish_connection(self, username: str = None, password: str = None, security_token: str = None, instance_url: str = None) -> bool:
         """Initiates and authenticates the connection to the Salesforce org.
         
         Args:
             username: Salesforce username. If not provided, will try environment variable.
             password: Salesforce password. If not provided, will try environment variable.
             security_token: Salesforce security token. If not provided, will try environment variable.
+            instance_url: Salesforce instance URL. If not provided, will use login.salesforce.com.
 
         Returns:
             bool: Returns True upon successful authentication, False otherwise.
@@ -105,20 +132,54 @@ class OrgHandler:
             final_username = username or os.getenv("USERNAME")
             final_password = password or os.getenv("PASSWORD")
             final_security_token = security_token or os.getenv("SECURITY_TOKEN", "")
+            final_instance_url = instance_url or os.getenv("INSTANCE_URL")
+            
+            print(f"🔍 SF CONNECTION DEBUG: Username: {final_username}")
+            print(f"🔍 SF CONNECTION DEBUG: Password length: {len(final_password) if final_password else 0}")
+            print(f"🔍 SF CONNECTION DEBUG: Security token length: {len(final_security_token)}")
+            print(f"🔍 SF CONNECTION DEBUG: Instance URL: {final_instance_url}")
             
             if not final_username or not final_password:
-                print("Missing required Salesforce credentials (username/password)")
+                print("❌ SF CONNECTION ERROR: Missing required Salesforce credentials (username/password)")
                 return False
+            
+            # Determine domain from instance URL
+            domain = None
+            if final_instance_url:
+                if 'test.salesforce.com' in final_instance_url or 'sandbox' in final_instance_url:
+                    domain = 'test'
+                    print("🔍 SF CONNECTION DEBUG: Using SANDBOX domain")
+                else:
+                    domain = 'login'
+                    print("🔍 SF CONNECTION DEBUG: Using PRODUCTION domain") 
+            else:
+                print("🔍 SF CONNECTION DEBUG: No instance URL, using default login domain")
                 
+            print("🔄 SF CONNECTION DEBUG: Attempting Salesforce connection...")
             self.connection = Salesforce(
                 username=final_username,
                 password=final_password,
                 security_token=final_security_token,
+                domain=domain,
                 timeout=10  # 10-second timeout for auth calls
             )
+            
+            # Test the connection
+            print("🔄 SF CONNECTION DEBUG: Testing connection with simple query...")
+            test_result = self.connection.query("SELECT Id FROM User LIMIT 1")
+            print(f"✅ SF CONNECTION SUCCESS: Connected! Session ID: {self.connection.session_id[:20]}...")
+            print(f"✅ SF CONNECTION SUCCESS: Test query returned {len(test_result['records'])} records")
+            print(f"✅ SF CONNECTION SUCCESS: Instance: {self.connection.sf_instance}")
+            
             return True
+            
         except Exception as e:
-            print(f"Failed to establish Salesforce connection: {str(e)}")
+            print(f"❌ SF CONNECTION ERROR: {str(e)}")
+            print(f"❌ SF CONNECTION ERROR TYPE: {type(e).__name__}")
+            if hasattr(e, 'content'):
+                print(f"❌ SF CONNECTION ERROR CONTENT: {e.content}")
+            if hasattr(e, 'status_code'):
+                print(f"❌ SF CONNECTION ERROR STATUS: {e.status_code}")
             self.connection = None
             return False
     
@@ -133,17 +194,28 @@ class OrgHandler:
             bool: Returns True upon successful authentication, False otherwise.
         """
         try:
+            print("🔄 ENCRYPTED CREDENTIALS DEBUG: Starting decryption...")
             # Decrypt credentials
             credentials = decrypt_credentials(encrypted_credentials, encryption_key)
+            print("✅ ENCRYPTED CREDENTIALS DEBUG: Decryption successful")
+            
+            # Handle both securityToken and security_token formats
+            security_token = credentials.get('security_token') or credentials.get('securityToken', '')
+            instance_url = credentials.get('instance_url') or credentials.get('instanceUrl')
+            
+            print(f"🔍 ENCRYPTED CREDENTIALS DEBUG: Final security token length: {len(security_token)}")
+            print(f"🔍 ENCRYPTED CREDENTIALS DEBUG: Final instance URL: {instance_url}")
             
             # Establish connection using decrypted credentials
             return self.establish_connection(
                 username=credentials.get('username'),
                 password=credentials.get('password'),
-                security_token=credentials.get('security_token', '')
+                security_token=security_token,
+                instance_url=instance_url
             )
         except Exception as e:
-            print(f"Failed to establish connection with encrypted credentials: {str(e)}")
+            print(f"❌ ENCRYPTED CREDENTIALS ERROR: {str(e)}")
+            print(f"❌ ENCRYPTED CREDENTIALS ERROR TYPE: {type(e).__name__}")
             self.connection = None
             return False
     
