@@ -113,7 +113,8 @@ class OrgHandler:
             self.connection = Salesforce(
                 username=final_username,
                 password=final_password,
-                security_token=final_security_token
+                security_token=final_security_token,
+                timeout=10  # 10-second timeout for auth calls
             )
             return True
         except Exception as e:
