@@ -22,6 +22,17 @@ class TextContent:
         self.type = type
         self.text = text
 
+def serialize_response(content):
+    """Convert response objects to JSON-serializable format"""
+    if hasattr(content, 'text'):
+        return [{"type": "text", "text": content.text}]
+    elif isinstance(content, list):
+        return [{"type": "text", "text": str(item)} for item in content]
+    elif isinstance(content, str):
+        return [{"type": "text", "text": content}]
+    else:
+        return [{"type": "text", "text": str(content)}]
+
 def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_credentials: Optional[str] = None, request_headers: Optional[Dict[str, str]] = None):
     """Get a fresh Salesforce client connection with provided or inferred credentials."""
     if not sfdc_client:
