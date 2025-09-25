@@ -191,26 +191,52 @@ def handle_call_tool(name: str, arguments: dict[str, Any], request_headers: Opti
         # Call the appropriate implementation
         if name == "create_object":
             return sfmcpimpl.create_object_impl(client, arguments)
-        elif name == "create_einstein_model":
-            return sfmcpimpl.create_einstein_model_impl(client, arguments)
+        elif name == "create_object_with_fields":
+            return sfmcpimpl.create_object_with_fields_impl(client, arguments)
+        elif name == "delete_object_fields":
+            return sfmcpimpl.delete_object_fields_impl(client, arguments)
         elif name == "create_tab":
             return sfmcpimpl.create_tab_impl(client, arguments)
         elif name == "create_custom_app":
             return sfmcpimpl.create_custom_app_impl(client, arguments)
-        elif name == "query_salesforce":
-            return sfmcpimpl.query_salesforce_impl(client, arguments)
         elif name == "run_soql_query":
             return sfmcpimpl.run_soql_query_impl(client, arguments)
+        elif name == "run_sosl_search":
+            return sfmcpimpl.run_sosl_search_impl(client, arguments)
+        elif name == "get_object_fields":
+            return sfmcpimpl.get_object_fields_impl(client, arguments)
         elif name == "create_record":
             return sfmcpimpl.create_record_impl(client, arguments)
         elif name == "update_record":
             return sfmcpimpl.update_record_impl(client, arguments)
         elif name == "delete_record":
             return sfmcpimpl.delete_record_impl(client, arguments)
-        elif name == "search_salesforce":
-            return sfmcpimpl.search_salesforce_impl(client, arguments)
-        elif name == "create_folder":
-            return sfmcpimpl.create_folder_impl(client, arguments)
+        elif name == "create_custom_fields":
+            return sfmcpimpl.create_custom_fields_impl(client, arguments)
+        elif name == "define_tabs_on_app":
+            return sfmcpimpl.define_tabs_on_app_impl(client, arguments)
+        elif name == "create_report_folder":
+            return sfmcpimpl.create_report_folder_impl(client, arguments)
+        elif name == "create_dashboard_folder":
+            return sfmcpimpl.create_dashboard_folder_impl(client, arguments)
+        elif name == "create_validation_rule":
+            return sfmcpimpl.create_validation_rule_impl(client, arguments)
+        elif name == "create_custom_metadata_type":
+            return sfmcpimpl.create_custom_metadata_type_impl(client, arguments)
+        elif name == "create_lightning_page":
+            return sfmcpimpl.create_lightning_page_impl(client, arguments)
+        elif name == "describe_object":
+            return sfmcpimpl.describe_object_impl(client, arguments)
+        elif name == "describe_relationship_fields":
+            return sfmcpimpl.describe_relationship_fields_impl(client, arguments)
+        elif name == "get_fields_by_type":
+            return sfmcpimpl.get_fields_by_type_impl(client, arguments)
+        elif name == "get_picklist_values":
+            return sfmcpimpl.get_picklist_values_impl(client, arguments)
+        elif name == "get_validation_rules":
+            return sfmcpimpl.get_validation_rules_impl(client, arguments)
+        elif name == "create_einstein_model":
+            return sfmcpimpl.create_einstein_model_impl(client, arguments)
         else:
             return {
                 "content": [TextContent("text", f"Unknown tool: {name}")]
