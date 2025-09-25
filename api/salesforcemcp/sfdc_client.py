@@ -253,7 +253,10 @@ class OrgHandler:
             raise ValueError(f"Failed to retrieve fields for '{object_name}': {str(e)}")
 
 def write_to_file(content):
-    with open(f"{BASE_PATH}/mylog.txt", 'a') as f:
+    # Use /tmp directory - only writable location in Vercel serverless
+    import tempfile
+    log_file = os.path.join(tempfile.gettempdir(), "einstein_model.log")
+    with open(log_file, 'a') as f:
         f.write(content)
 
 def zip_directory(filepath):
@@ -811,7 +814,10 @@ def create_einstein_model_package(json_obj):
         
     except Exception as e:
         err_msg = f"Error creating Einstein model package: {e}"
-        with open(f"{BASE_PATH}/check.txt", 'a') as f:
+        # Write error to temp file (only writable location in serverless)
+        import tempfile
+        error_log = os.path.join(tempfile.gettempdir(), "einstein_errors.log")
+        with open(error_log, 'a') as f:
             f.write(err_msg)
         raise Exception(err_msg)
 
