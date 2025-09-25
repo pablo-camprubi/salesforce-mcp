@@ -11,7 +11,9 @@ import zipfile
 
 # In serverless environment, assets are in the current directory structure
 BASE_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # Go up to api/ directory
-DEPLOY_DIR = "deployment_package"
+# Use /tmp for deployment directory - only writable location in Vercel serverless
+import tempfile
+DEPLOY_DIR = os.path.join(tempfile.gettempdir(), "deployment_package")
 
 def decrypt_credentials(encrypted_credentials: str, encryption_key: str = None) -> Dict[str, str]:
     """
@@ -738,7 +740,7 @@ def create_einstein_model_package(json_obj):
         
         # Copy Einstein model template structure
         source_template = os.path.join(BASE_PATH, "assets", "create_einstein_model_tmpl", "appTemplates", "##template_name##")
-        deploy_dir = os.path.join(BASE_PATH, DEPLOY_DIR)
+        deploy_dir = DEPLOY_DIR  # Already points to /tmp/deployment_package
         target_template_dir = os.path.join(deploy_dir, "appTemplates", template_name)
         
         # Create directory structure
@@ -910,12 +912,13 @@ def build_einstein_fields_json(fields, outcome_field):
 
 def deploy_package_from_deploy_dir(sf):
     """Zips the DEPLOY_DIR and deploys it via the Metadata API."""
-    deploy_dir_path = os.path.join(BASE_PATH, DEPLOY_DIR)
+    deploy_dir_path = DEPLOY_DIR  # Already points to /tmp/deployment_package
     if not os.path.exists(deploy_dir_path):
         raise FileNotFoundError(f"Deployment directory not found: {deploy_dir_path}")
 
     # Zip only the contents of the deployment directory (no parent folder)
-    zip_path = os.path.join(BASE_PATH, "deploy_package.zip")
+    # Use /tmp for zip file as well
+    zip_path = os.path.join(tempfile.gettempdir(), "deploy_package.zip")
     # Remove old zip if present
     if os.path.exists(zip_path):
         os.remove(zip_path)
