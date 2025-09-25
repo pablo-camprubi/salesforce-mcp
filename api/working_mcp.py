@@ -199,6 +199,8 @@ def handle_call_tool(name: str, arguments: dict[str, Any], request_headers: Opti
             return sfmcpimpl.create_custom_app_impl(client, arguments)
         elif name == "query_salesforce":
             return sfmcpimpl.query_salesforce_impl(client, arguments)
+        elif name == "run_soql_query":
+            return sfmcpimpl.run_soql_query_impl(client, arguments)
         elif name == "create_record":
             return sfmcpimpl.create_record_impl(client, arguments)
         elif name == "update_record":
