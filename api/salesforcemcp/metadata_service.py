@@ -632,7 +632,10 @@ def deploy(b64, sf):
 
     # Log the request body (optional, good for debugging but might log session ID)
     # print(f"SOAP Request Body:\n{xml_body}")
-    with open(f"{BASE_PATH}/deploy.log", "w", encoding="utf-8") as file:
+    # Use /tmp for log files in serverless environment
+    import tempfile
+    deploy_log = os.path.join(tempfile.gettempdir(), "deploy.log")
+    with open(deploy_log, "w", encoding="utf-8") as file:
         file.write(xml_body)
 
     try:
@@ -640,7 +643,9 @@ def deploy(b64, sf):
         
         print(f"Deployment API Response Status: {response.status_code}")
         print(f"Deployment API Response Text:\n{response.text}")
-        with open(f"{BASE_PATH}/deploy_http.log", "w", encoding="utf-8") as file:
+        # Use /tmp for log files in serverless environment
+        deploy_http_log = os.path.join(tempfile.gettempdir(), "deploy_http.log")
+        with open(deploy_http_log, "w", encoding="utf-8") as file:
             file.write(response.text)
 
         # --- Add Robust Error Checking --- 
