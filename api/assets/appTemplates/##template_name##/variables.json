@@ -1,0 +1,28 @@
+{
+  "variables": [
+    {
+      "name": "model_label",
+      "label": "Model Label",
+      "type": "Text",
+      "required": true
+    },
+    {
+      "name": "model_description", 
+      "label": "Model Description",
+      "type": "LongText",
+      "required": true
+    },
+    {
+      "name": "outcome_field",
+      "label": "Outcome Field",
+      "type": "Text", 
+      "required": true
+    },
+    {
+      "name": "data_source",
+      "label": "Data Source",
+      "type": "Text",
+      "required": true
+    }
+  ]
+}

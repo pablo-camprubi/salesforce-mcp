@@ -1,0 +1,12 @@
+{
+  "description": "##setup_description##",
+  "dataSource": "##data_source##",
+  "outcomeType": "##outcome_type##",
+  "failureValue": "##failure_value##",
+  "goal": "##goal##",
+  "outcomeLabel": "##outcome_label##",
+  "outcomeField": "##outcome_field##",
+  "successValue": "##success_value##",
+  "algorithmType": "##algorithm_type##",
+  "fields": ##fields_json##
+}

@@ -1,0 +1,8 @@
+{
+  "label": "##model_label##",
+  "description": "##model_description##",
+  "modelCapability": "##model_capability##",
+  "outcomeField": "##outcome_field##",
+  "goal": "##goal##",
+  "apiName": "##template_name##_Container"
+}

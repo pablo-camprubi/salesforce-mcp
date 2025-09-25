@@ -1,0 +1,15 @@
+{
+  "chainType": "Model",
+  "label": "##model_label##",
+  "description": "##model_description##",
+  "steps": [
+    {
+      "type": "ModelContainer",
+      "apiName": "##template_name##_Container"
+    },
+    {
+      "type": "ModelSetup", 
+      "apiName": "##template_name##_Setup"
+    }
+  ]
+}
