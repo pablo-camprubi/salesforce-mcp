@@ -60,20 +60,9 @@ def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_creden
     client = sfdc_client.OrgHandler()
     
     try:
-        # Add timeout protection for all connection attempts  
-        import signal
-        
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Salesforce connection timeout")
-            
-        # Set 15-second timeout for entire connection process
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(15)
-        
         # Priority order: encrypted_credentials, credentials, headers, environment variables
         if encrypted_credentials:
             if not client.establish_connection_with_encrypted_credentials(encrypted_credentials):
-                signal.alarm(0)  # Cancel timeout
                 return None
         elif credentials:
             if not client.establish_connection(
@@ -81,7 +70,6 @@ def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_creden
                 password=credentials.get('password'),
                 security_token=credentials.get('security_token')
             ):
-                signal.alarm(0)  # Cancel timeout
                 return None
         elif request_headers:
             sf_encrypted_header = request_headers.get('X-Salesforce-Encrypted-Credentials', '')
@@ -89,7 +77,6 @@ def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_creden
             
             if sf_encrypted_header:
                 if not client.establish_connection_with_encrypted_credentials(sf_encrypted_header):
-                    signal.alarm(0)  # Cancel timeout
                     return None
             elif sf_credentials_header:
                 try:
@@ -99,31 +86,21 @@ def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_creden
                         password=creds.get('password'),
                         security_token=creds.get('security_token')
                     ):
-                        signal.alarm(0)  # Cancel timeout
                         return None
                 except json.JSONDecodeError:
-                    signal.alarm(0)  # Cancel timeout
                     return None
             else:
                 # Use environment variables
                 if not client.establish_connection():
-                    signal.alarm(0)  # Cancel timeout
                     return None
         else:
             # Use environment variables as fallback
             if not client.establish_connection():
-                signal.alarm(0)  # Cancel timeout
                 return None
                 
-        signal.alarm(0)  # Cancel timeout on success
         return client
         
-    except TimeoutError as e:
-        signal.alarm(0)  # Cancel timeout
-        print(f"Salesforce connection timeout: {e}")
-        return None
     except Exception as e:
-        signal.alarm(0)  # Cancel timeout
         print(f"Error establishing connection: {e}")
         return None
 
