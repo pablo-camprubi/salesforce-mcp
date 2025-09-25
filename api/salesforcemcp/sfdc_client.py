@@ -160,8 +160,7 @@ class OrgHandler:
                 username=final_username,
                 password=final_password,
                 security_token=final_security_token,
-                domain=domain,
-                timeout=10  # 10-second timeout for auth calls
+                domain=domain
             )
             
             # Test the connection
