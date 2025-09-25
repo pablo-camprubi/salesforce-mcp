@@ -585,8 +585,8 @@ def deploy(b64, sf):
         if not instance_url:
              raise ValueError("Could not retrieve instance URL from Salesforce connection.")
         # Construct the metadata API endpoint URL
-        # Ensure API version matches package.xml if necessary (using 58.0 here)
-        metadata_api_version = "58.0" 
+        # Ensure API version matches package.xml for Einstein Studio (using 61.0 for AppFrameworkTemplateBundle support)
+        metadata_api_version = "61.0" 
         endpoint = f"https://{instance_url}/services/Soap/m/{metadata_api_version}"
         print(f"Using dynamic endpoint: {endpoint}") # Log the endpoint being used
     except AttributeError as e:
