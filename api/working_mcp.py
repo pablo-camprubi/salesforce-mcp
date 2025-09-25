@@ -22,16 +22,35 @@ class TextContent:
         self.type = type
         self.text = text
 
-def serialize_response(content):
-    """Convert response objects to JSON-serializable format"""
-    if hasattr(content, 'text'):
-        return [{"type": "text", "text": content.text}]
-    elif isinstance(content, list):
-        return [{"type": "text", "text": str(item)} for item in content]
-    elif isinstance(content, str):
-        return [{"type": "text", "text": content}]
+def serialize_response(obj):
+    """Convert TextContent objects and other non-serializable objects to JSON-serializable format"""
+    if hasattr(obj, 'type') and hasattr(obj, 'text'):
+        # Handle individual TextContent objects
+        return {"type": obj.type, "text": obj.text}
+    elif isinstance(obj, list):
+        # Handle arrays of TextContent objects (most common case from implementations)
+        serialized_items = []
+        for item in obj:
+            if hasattr(item, 'type') and hasattr(item, 'text'):
+                # TextContent object in list
+                serialized_items.append({"type": item.type, "text": item.text})
+            else:
+                # Other objects
+                serialized_items.append(str(item))
+        return serialized_items
+    elif isinstance(obj, dict):
+        if "content" in obj and isinstance(obj["content"], list):
+            # Handle tool call response with content array
+            return {
+                **obj,
+                "content": [serialize_response(item) for item in obj["content"]]
+            }
+        else:
+            return {key: serialize_response(value) for key, value in obj.items()}
+    elif isinstance(obj, str):
+        return obj
     else:
-        return [{"type": "text", "text": str(content)}]
+        return str(obj)
 
 def get_sf_client(credentials: Optional[Dict[str, str]] = None, encrypted_credentials: Optional[str] = None, request_headers: Optional[Dict[str, str]] = None):
     """Get a fresh Salesforce client connection with provided or inferred credentials."""
