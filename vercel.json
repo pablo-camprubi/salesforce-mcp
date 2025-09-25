@@ -1,9 +1,4 @@
 {
-  "functions": {
-    "api/working_mcp.py": {
-      "runtime": "@vercel/python"
-    }
-  },
   "rewrites": [
     {
       "source": "/api/mcp",
@@ -16,10 +11,6 @@
     {
       "source": "/",
       "destination": "/api/working_mcp"
-    },
-    {
-      "source": "/client",
-      "destination": "/public/index.html"
     }
   ]
 }
