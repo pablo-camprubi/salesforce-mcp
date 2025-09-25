@@ -370,10 +370,12 @@ class handler(BaseHTTPRequestHandler):
                 name = params.get("name", "")
                 arguments = params.get("arguments", {})
                 result = handle_call_tool(name, arguments, headers_dict)
+                # Convert TextContent objects to JSON-serializable format
+                serialized_result = serialize_response(result)
                 response = {
                     "jsonrpc": "2.0",
                     "id": request_id,
-                    "result": result
+                    "result": serialized_result
                 }
             else:
                 response = {
