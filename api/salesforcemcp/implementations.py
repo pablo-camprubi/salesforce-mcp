@@ -193,23 +193,91 @@ def create_custom_app_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[st
 
 def run_soql_query_impl(sf_client: OrgHandler, arguments: dict[str, str]):
     query = arguments.get("query")
+    _sf_encrypted_credentials = arguments.get("_sf_encrypted_credentials")
+    
+    print(f"🔍 [SERVER DEBUG] run_soql_query_impl called")
+    print(f"🔍 [SERVER DEBUG] Query: {query}")
+    print(f"🔍 [SERVER DEBUG] Has encrypted credentials: {bool(_sf_encrypted_credentials)}")
+    
+    if _sf_encrypted_credentials:
+        import json, base64
+        
+        print(f"🔍 [SERVER DEBUG] Received encrypted credentials length: {len(_sf_encrypted_credentials)}")
+        
+        try:
+            # Decode credentials
+            decoded_bytes = base64.b64decode(_sf_encrypted_credentials)
+            decoded_str = decoded_bytes.decode('utf-8')
+            credentials = json.loads(decoded_str)
+            
+            print(f"✅ [SERVER DEBUG] Successfully decoded credentials")
+            print(f"🔍 [SERVER DEBUG] Username: {credentials.get('username')}")
+            print(f"🔍 [SERVER DEBUG] Password length: {len(credentials.get('password', ''))}")
+            print(f"🔍 [SERVER DEBUG] Security token: '{credentials.get('securityToken', 'EMPTY')}'")
+            print(f"🔍 [SERVER DEBUG] Instance URL: {credentials.get('instanceUrl')}")
+            
+            # Test Salesforce connection
+            from simple_salesforce import Salesforce
+            try:
+                print(f"🔄 [SERVER DEBUG] Attempting direct Salesforce connection...")
+                sf = Salesforce(
+                    username=credentials['username'],
+                    password=credentials['password'],
+                    security_token=credentials.get('securityToken', ''),
+                    domain='login'
+                )
+                print(f"✅ [SERVER DEBUG] Direct Salesforce connection successful!")
+                print(f"✅ [SERVER DEBUG] Session ID: {sf.session_id[:20]}...")
+                
+                # Test query with direct connection
+                print(f"🔄 [SERVER DEBUG] Testing query with direct connection...")
+                results = sf.query_all(query)
+                print(f"✅ [SERVER DEBUG] Direct query successful! {len(results.get('records', []))} records")
+                
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"DIRECT CONNECTION SUCCESS - SOQL Query Results (JSON):\\n{json.dumps(results, indent=2)}"
+                    )
+                ]
+                
+            except Exception as sf_error:
+                print(f"❌ [SERVER DEBUG] Direct Salesforce connection failed: {str(sf_error)}")
+                print(f"❌ [SERVER DEBUG] Direct connection error type: {type(sf_error).__name__}")
+                if hasattr(sf_error, 'content'):
+                    print(f"❌ [SERVER DEBUG] Error content: {sf_error.content}")
+                # Continue with sf_client method below
+            
+        except Exception as decode_error:
+            print(f"❌ [SERVER DEBUG] Credential decode error: {str(decode_error)}")
+            print(f"❌ [SERVER DEBUG] Decode error type: {type(decode_error).__name__}")
+            return [types.TextContent(type="text", text=f"Debug - Credential decode error: {str(decode_error)}")]
+    
+    # Original sf_client method
     if not query:
         raise ValueError("Missing 'query' argument")
     if not sf_client.connection:
+        print(f"❌ [SERVER DEBUG] sf_client.connection is None - connection not established")
         raise ValueError("Salesforce connection not established.")
+    
+    print(f"🔄 [SERVER DEBUG] Using sf_client.connection for query...")
     try:
         results = sf_client.connection.query_all(query)
+        print(f"✅ [SERVER DEBUG] sf_client query successful! {len(results.get('records', []))} records")
         # Consider limits on result size? Truncate or summarize if too large?
         return [
             types.TextContent(
                 type="text",
-                text=f"SOQL Query Results (JSON):\\n{json.dumps(results, indent=2)}"
+                text=f"SF_CLIENT SUCCESS - SOQL Query Results (JSON):\\n{json.dumps(results, indent=2)}"
             )
         ]
     except SalesforceError as e:
-        return [types.TextContent(type="text", text=f"SOQL Error: {e.status} {e.resource_name} {e.content}")]
+        print(f"❌ [SERVER DEBUG] SalesforceError: {e.status} {e.resource_name} {e.content}")
+        return [types.TextContent(type="text", text=f"Debug - SOQL Error: {e.status} {e.resource_name} {e.content}")]
     except Exception as e:
-        return [types.TextContent(type="text", text=f"Error executing SOQL: {e}")]
+        print(f"❌ [SERVER DEBUG] General error executing SOQL: {str(e)}")
+        print(f"❌ [SERVER DEBUG] Error type: {type(e).__name__}")
+        return [types.TextContent(type="text", text=f"Debug - Error executing SOQL: {e}")]
 
 def run_sosl_search_impl(sf_client: OrgHandler, arguments: dict[str, str]):
     search = arguments.get("search")
