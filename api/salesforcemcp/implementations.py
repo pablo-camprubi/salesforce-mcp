@@ -192,6 +192,8 @@ def create_custom_app_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[st
 # --- Data Operations ---
 
 def run_soql_query_impl(sf_client: OrgHandler, arguments: dict[str, str]):
+    import json, base64  # Import at function level to fix scope issue
+    
     query = arguments.get("query")
     _sf_encrypted_credentials = arguments.get("_sf_encrypted_credentials")
     
@@ -200,7 +202,6 @@ def run_soql_query_impl(sf_client: OrgHandler, arguments: dict[str, str]):
     print(f"🔍 [SERVER DEBUG] Has encrypted credentials: {bool(_sf_encrypted_credentials)}")
     
     if _sf_encrypted_credentials:
-        import json, base64
         
         print(f"🔍 [SERVER DEBUG] Received encrypted credentials length: {len(_sf_encrypted_credentials)}")
         
