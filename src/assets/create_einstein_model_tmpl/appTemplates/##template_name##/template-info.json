@@ -2,6 +2,5 @@
   "label": "##model_label##",
   "description": "##template_description##",
   "name": "##template_name##",
-  "version": "1.0",
   "templateType": "Einstein"
 }
