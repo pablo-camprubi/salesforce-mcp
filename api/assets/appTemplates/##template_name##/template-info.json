@@ -1,7 +1,6 @@
 {
   "label": "##model_label##",
   "description": "##template_description##",
-  "templateName": "##template_name##",
-  "templateVersion": "1.0",
-  "templateType": "Einstein"
+  "name": "##template_name##",
+  "templateType": "Analytics"
 }
