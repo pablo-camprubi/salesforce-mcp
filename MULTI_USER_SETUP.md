@@ -197,3 +197,4 @@ Each request is completely isolated with its own authentication context.
 ---
 
 🎉 **Ready to test? Try toggling Salesforce ON and see your beautiful login popup!** 🎯
+

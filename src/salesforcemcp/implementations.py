@@ -25,16 +25,25 @@ def create_object_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, A
 
     if not sf_client.connection:
         raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
-    metadata_service.write_to_file(json.dumps(json_obj))
-    metadata_service.create_metadata_package(json_obj)
-    metadata_service.deploy_object_package(sf_client.connection)
+    
+    try:
+        metadata_service.write_to_file(json.dumps(json_obj))
+        metadata_service.create_metadata_package(json_obj)
+        metadata_service.deploy_object_package(sf_client.connection)
 
-    return [
-        types.TextContent(
-            type="text",
-            text=f"Custom Object '{api_name}' creation package prepared and deployment initiated."
-        )
-    ]
+        return [
+            types.TextContent(
+                type="text",
+                text=f"Custom Object '{api_name}' creation package prepared and deployment initiated."
+            )
+        ]
+    except Exception as e:
+        return [
+            types.TextContent(
+                type="text",
+                text=f"Error creating custom object '{api_name}': {str(e)}"
+            )
+        ]
 
 def create_object_with_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]):
     name = arguments.get("name")
@@ -52,16 +61,25 @@ def create_object_with_fields_impl(sf_client: sfdc_client.OrgHandler, arguments:
 
     if not sf_client.connection:
         raise ValueError("Salesforce connection is not active. Cannot perform metadata deployment.")
-    metadata_service.write_to_file(json.dumps(json_obj))
-    metadata_service.create_metadata_package(json_obj)
-    metadata_service.deploy_object_package(sf_client.connection)
+    
+    try:
+        metadata_service.write_to_file(json.dumps(json_obj))
+        metadata_service.create_metadata_package(json_obj)
+        metadata_service.deploy_object_package(sf_client.connection)
 
-    return [
-        types.TextContent(
-            type="text",
-            text=f"Custom Object '{api_name}' with enhanced fields creation package prepared and deployment initiated."
-        )
-    ]
+        return [
+            types.TextContent(
+                type="text",
+                text=f"Custom Object '{api_name}' with enhanced fields creation package prepared and deployment initiated."
+            )
+        ]
+    except Exception as e:
+        return [
+            types.TextContent(
+                type="text",
+                text=f"Error creating custom object '{api_name}': {str(e)}"
+            )
+        ]
 
 def delete_object_fields_impl(sf_client: sfdc_client.OrgHandler, arguments: dict[str, Any]):
     api_name = arguments.get("api_name")

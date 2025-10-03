@@ -217,8 +217,11 @@ def create_metadata_package(json_obj):
             f.write(profile_xml)
 
     except Exception as e:
+        # Reset the global variable since package creation failed
+        current_package_dir = None
         err_msg = f"An error occurred: {e}"
         print(f"Metadata package error: {err_msg}")  # Use print instead of file write
+        raise  # Re-raise the exception so the caller knows it failed
 
 
 def delete_fields(json_obj):
@@ -874,7 +877,10 @@ def deploy_object_package(sf):
     """Simple deployment for custom objects - no app-specific logic"""
     global current_package_dir
     if current_package_dir is None:
-        raise ValueError("No package directory available for deployment")
+        raise ValueError("No package directory available for deployment. Package creation may have failed.")
+    
+    if not os.path.exists(current_package_dir):
+        raise ValueError(f"Package directory does not exist: {current_package_dir}")
     
     # Simple deployment without app-specific logic
     zip_directory(current_package_dir)
