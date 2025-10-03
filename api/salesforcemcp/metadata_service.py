@@ -19,9 +19,11 @@ DEPLOY_DIR = "deployment_package"
 def get_assets_path():
     """Find the assets directory in various possible locations"""
     possible_paths = [
-        os.path.join(os.path.dirname(__file__), '..', 'assets'),  # Local development
-        os.path.join('/var/task/src', 'assets'),  # Vercel serverless
-        os.path.join('/var/task', 'src', 'assets'),  # Alternative Vercel path
+        os.path.join(os.path.dirname(__file__), '..', 'assets'),  # Local development (api/assets)
+        os.path.join('/var/task/api', 'assets'),  # Vercel API serverless
+        os.path.join('/var/task', 'api', 'assets'),  # Alternative Vercel API path
+        os.path.join('/var/task/src', 'assets'),  # Vercel src serverless
+        os.path.join('/var/task', 'src', 'assets'),  # Alternative Vercel src path
         os.path.join(os.path.dirname(__file__), 'assets'),  # Direct relative
     ]
     
